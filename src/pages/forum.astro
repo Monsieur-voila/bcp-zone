@@ -1,0 +1,76 @@
+---
+import Base from "../layouts/Base.astro";
+import { forum } from "../site.config";
+
+// ── Giscus ────────────────────────────────────────────────────
+// Fill these four from https://giscus.app after enabling Discussions
+// on your GitHub repo. Everything else is set.
+const giscus = {
+  repo: "YOUR_GH_USER/YOUR_REPO",        // e.g. "sonny/site"
+  repoId: "YOUR_REPO_ID",
+  category: "General",
+  categoryId: "YOUR_CATEGORY_ID",
+};
+---
+
+<Base title={`${forum.label} — Sonny`}>
+  <a slot="head" />
+
+  <main class="forum-page">
+    <a class="back" href="/">← back</a>
+    <h1 class="title">{forum.label}</h1>
+    <p class="sub">{forum.line}</p>
+
+    <div class="giscus-mount">
+      <script
+        src="https://giscus.app/client.js"
+        data-repo={giscus.repo}
+        data-repo-id={giscus.repoId}
+        data-category={giscus.category}
+        data-category-id={giscus.categoryId}
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="en"
+        crossorigin="anonymous"
+        async
+      ></script>
+    </div>
+  </main>
+</Base>
+
+<style>
+  .forum-page {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 6rem;
+    min-height: 100svh;
+  }
+  .back {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--sage);
+  }
+  .back:hover { color: var(--oxide); }
+  .title {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(2.4rem, 8vw, 4rem);
+    letter-spacing: 0.03em;
+    margin: 1.4rem 0 0.5rem;
+    color: var(--snowmelt);
+  }
+  .sub {
+    font-family: var(--body);
+    font-style: italic;
+    font-size: 1.1rem;
+    color: var(--sage);
+    margin: 0 0 2.6rem;
+  }
+  .giscus-mount { min-height: 300px; }
+</style>

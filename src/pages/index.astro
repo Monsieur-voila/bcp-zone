@@ -1,0 +1,287 @@
+---
+import Base from "../layouts/Base.astro";
+import StatusStrip from "../components/StatusStrip.astro";
+import { site, doorways, forum } from "../site.config";
+---
+
+<Base title={`${site.name} — a signal in the valley`}>
+  <!-- ══ SPLASH ══════════════════════════════════════════════ -->
+  <section class="splash">
+    <!-- the signature: an oxide signal-line — radio waveform and a
+         horizon of moved earth at once. A faint pulse travels its
+         length, like a signal moving down a wire. -->
+    <svg class="signalline" viewBox="0 0 1200 120" preserveAspectRatio="none" aria-hidden="true">
+      <!-- base line: always visible, dim -->
+      <path class="sl-base"
+        d="M0,60 L360,60 Q380,60 388,44 T404,60 Q412,84 420,60 L470,60
+           Q478,60 484,50 T496,60 L560,60 L580,26 L600,94 L620,60 L1200,60"
+        fill="none" stroke="var(--oxide)" stroke-width="1.5" />
+      <!-- travelling pulse: same path, bright, a short dash that sweeps -->
+      <path class="sl-pulse"
+        d="M0,60 L360,60 Q380,60 388,44 T404,60 Q412,84 420,60 L470,60
+           Q478,60 484,50 T496,60 L560,60 L580,26 L600,94 L620,60 L1200,60"
+        fill="none" stroke="var(--oxide)" stroke-width="2" />
+    </svg>
+
+    <div class="splash-inner">
+      <h1 class="name">{site.name}</h1>
+      <p class="tagline">{site.tagline}</p>
+      <a class="enter" href={site.entryHref}>
+        {site.entryLabel}
+        <span class="enter-mark" aria-hidden="true">↓</span>
+      </a>
+    </div>
+
+    <p class="ethos">
+      Community first — the comfort of connection, attention to detail,
+      and family kept close.
+    </p>
+  </section>
+
+  <!-- ══ DEPOT ═══════════════════════════════════════════════ -->
+  <main id="depot" class="depot">
+    <p class="depot-eyebrow">The depot</p>
+
+    <!-- FORUM FIRST. It's the point. Given full width and the top slot. -->
+    <a
+      class="forum"
+      href={forum.href}
+      data-activity={forum.live ? "live" : "quiet"}
+      data-last={forum.lastActivity}
+    >
+      <span class="forum-pulse" aria-hidden="true"></span>
+      <div class="forum-text">
+        <span class="forum-label">{forum.label}</span>
+        <span class="forum-line">{forum.line}</span>
+      </div>
+      <span class="forum-cta" aria-hidden="true">Enter →</span>
+    </a>
+
+    <!-- the other doorways -->
+    <div class="doors">
+      {doorways.map((d) => (
+        <a class="door" href={d.href}>
+          <span class="door-label">{d.label}</span>
+          <span class="door-line">{d.line}</span>
+        </a>
+      ))}
+    </div>
+  </main>
+
+  <StatusStrip />
+</Base>
+
+<style>
+  /* ── SPLASH ────────────────────────────────────────────── */
+  .splash {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem 5rem;
+    background:
+      radial-gradient(120% 80% at 50% 0%, var(--twilight) 0%, var(--basalt) 62%);
+    overflow: hidden;
+  }
+
+  .signalline {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 120px;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  .sl-base { opacity: 0.32; }
+
+  /* the pulse: a short bright dash that travels the whole path.
+     pathLength-independent — large dash + gap, offset animated. */
+  .sl-pulse {
+    opacity: 0.9;
+    stroke-dasharray: 90 3000;
+    stroke-dashoffset: 3090;
+    filter: drop-shadow(0 0 3px rgba(192, 90, 46, 0.6));
+    animation: travel 7s linear infinite;
+  }
+  @keyframes travel {
+    to { stroke-dashoffset: 0; }
+  }
+
+  /* stillness for anyone who asks for it */
+  @media (prefers-reduced-motion: reduce) {
+    .sl-base  { opacity: 0.55; }
+    .sl-pulse { display: none; }
+  }
+
+  .splash-inner {
+    position: relative;
+    text-align: center;
+    z-index: 1;
+  }
+
+  .name {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(3.4rem, 14vw, 8.5rem);
+    line-height: 0.92;
+    letter-spacing: 0.04em;
+    margin: 0;
+    color: var(--snowmelt);
+  }
+
+  .tagline {
+    font-family: var(--body);
+    font-style: italic;
+    font-size: clamp(1.05rem, 3.2vw, 1.5rem);
+    color: var(--sage);
+    margin: 1rem 0 2.2rem;
+  }
+
+  .enter {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--snowmelt);
+    padding: 0.75rem 1.4rem;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    transition: border-color 0.25s ease, background 0.25s ease;
+  }
+  .enter:hover { border-color: var(--oxide); background: rgba(192, 90, 46, 0.06); }
+  .enter-mark { color: var(--oxide); }
+
+  .ethos {
+    position: absolute;
+    bottom: 3.4rem;
+    max-width: 34ch;
+    text-align: center;
+    font-family: var(--body);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--sage);
+    opacity: 0.85;
+    margin: 0;
+    padding: 0 1rem;
+    z-index: 1;
+  }
+
+  /* ── DEPOT ─────────────────────────────────────────────── */
+  .depot {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 5rem 1.5rem 7rem;
+  }
+
+  .depot-eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin: 0 0 1.6rem;
+  }
+
+  /* FORUM — the priority entry */
+  .forum {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    padding: 1.6rem 1.8rem;
+    background:
+      linear-gradient(180deg, var(--basalt-2) 0%, #171b1f 100%);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--oxide);
+    border-radius: 3px;
+    margin-bottom: 1.4rem;
+    transition: border-color 0.25s ease, transform 0.25s ease;
+  }
+  .forum:hover { border-color: var(--sage); transform: translateY(-1px); }
+
+  /* the pulse dot. inert ("quiet") by default; when the config's
+     forum.live flips to true (or a Pages Function sets data-activity
+     to "live"), it pulses. Zero markup change needed later. */
+  .forum-pulse {
+    flex: none;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--sage);
+    opacity: 0.4;
+    position: relative;
+  }
+  .forum[data-activity="live"] .forum-pulse {
+    background: var(--oxide);
+    opacity: 1;
+    animation: pulse 1.8s ease-out infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(192, 90, 46, 0.55); }
+    70%  { box-shadow: 0 0 0 12px rgba(192, 90, 46, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(192, 90, 46, 0); }
+  }
+
+  .forum-text { display: flex; flex-direction: column; gap: 0.3rem; }
+  .forum-label {
+    font-family: var(--display);
+    font-size: 1.7rem;
+    letter-spacing: 0.02em;
+    color: var(--snowmelt);
+  }
+  .forum-line {
+    font-family: var(--body);
+    font-size: 1rem;
+    color: var(--sage);
+  }
+  .forum-cta {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--oxide);
+    white-space: nowrap;
+  }
+
+  /* the other doorways */
+  .doors {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+  .door {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 1.4rem 1.5rem;
+    background: var(--basalt-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    transition: border-color 0.25s ease, transform 0.25s ease;
+  }
+  .door:hover { border-color: var(--oxide); transform: translateY(-1px); }
+  .door-label {
+    font-family: var(--display);
+    font-size: 1.35rem;
+    letter-spacing: 0.02em;
+    color: var(--snowmelt);
+  }
+  .door-line {
+    font-family: var(--body);
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: var(--sage);
+  }
+
+  @media (max-width: 560px) {
+    .forum { flex-wrap: wrap; }
+    .forum-cta { margin-left: 0; width: 100%; }
+    .ethos { bottom: 4.2rem; }
+  }
+</style>
