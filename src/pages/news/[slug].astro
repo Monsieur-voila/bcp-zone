@@ -1,0 +1,94 @@
+---
+import SiteFrame from "../../layouts/SiteFrame.astro";
+import { getCollection } from "astro:content";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("news", ({ data }) => !data.draft);
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await post.render();
+const fmt = (d) =>
+  d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+---
+
+<SiteFrame title={`${post.data.title} — SONNY`} description={post.data.summary}>
+  <article class="post">
+    <a class="back" href="/">← all news</a>
+
+    <div class="post-meta">
+      <span>{fmt(post.data.date)}</span>
+      <span>·</span>
+      <span>{post.data.author}</span>
+      {post.data.tag && <span class="post-tag">{post.data.tag}</span>}
+    </div>
+
+    <h1 class="post-title">{post.data.title}</h1>
+    <p class="post-summary">{post.data.summary}</p>
+
+    <div class="post-body">
+      <Content />
+    </div>
+
+    <!-- Comments mount here in Stage 5 (data-driven, routes to The Table). -->
+    <div class="comments-mount" data-post={post.slug} aria-label="Comments">
+      <p class="comments-soon">Comments open here soon — and echo into The Table.</p>
+    </div>
+  </article>
+</SiteFrame>
+
+<style>
+  .post { max-width: 68ch; margin: 0 auto; }
+  .back {
+    font-family: var(--mono); font-size: 0.7rem;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--sage);
+  }
+  .back:hover { color: var(--oxide); }
+  .post-meta {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 0.66rem;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--sage); margin: 1.6rem 0 0.8rem;
+  }
+  .post-tag {
+    color: var(--oxide); border: 1px solid var(--line);
+    border-radius: 2px; padding: 0.1rem 0.5rem;
+  }
+  .post-title {
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.05;
+    margin: 0 0 0.8rem; color: var(--snowmelt);
+  }
+  .post-summary {
+    font-family: var(--body); font-style: italic;
+    font-size: 1.2rem; line-height: 1.5; color: var(--sage);
+    margin: 0 0 2.4rem;
+  }
+  .post-body {
+    font-family: var(--body); font-size: 1.12rem; line-height: 1.7;
+    color: var(--snowmelt);
+  }
+  .post-body :global(p) { margin: 0 0 1.3rem; }
+  .post-body :global(h2) {
+    font-family: var(--display); font-weight: 400; font-size: 1.7rem;
+    margin: 2.2rem 0 0.8rem; color: var(--snowmelt);
+  }
+  .post-body :global(a) { color: var(--oxide); text-decoration: underline; }
+  .post-body :global(blockquote) {
+    border-left: 2px solid var(--oxide); margin: 1.5rem 0;
+    padding-left: 1.2rem; color: var(--sage); font-style: italic;
+  }
+
+  .comments-mount {
+    margin-top: 3.5rem; padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+  }
+  .comments-soon {
+    font-family: var(--mono); font-size: 0.72rem;
+    letter-spacing: 0.06em; color: var(--sage);
+  }
+</style>

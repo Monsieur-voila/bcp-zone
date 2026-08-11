@@ -1,0 +1,193 @@
+---
+import SiteFrame from "../layouts/SiteFrame.astro";
+import { getCollection } from "astro:content";
+import { forum } from "../site.config";
+
+const posts = (await getCollection("news", ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+
+const fmt = (d) =>
+  d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+---
+
+<SiteFrame title="SONNY — a signal in the valley">
+  <div class="home">
+    <main class="feed" aria-label="News">
+      <p class="feed-eyebrow">Latest</p>
+
+      {posts.length === 0 && (
+        <p class="empty">No posts yet. The first one goes here.</p>
+      )}
+
+      {posts.map((post) => (
+        <a class="card" href={`/news/${post.slug}`}>
+          <div class="card-meta">
+            <span class="card-date">{fmt(post.data.date)}</span>
+            {post.data.tag && <span class="card-tag">{post.data.tag}</span>}
+          </div>
+          <h2 class="card-title">{post.data.title}</h2>
+          <p class="card-summary">{post.data.summary}</p>
+          <span class="card-read" aria-hidden="true">Read →</span>
+        </a>
+      ))}
+    </main>
+
+    <aside
+      class="rail"
+      data-activity={forum.live ? "live" : "quiet"}
+      style={`--heat:${forum.heat}`}
+      aria-label="The Table — community forum"
+    >
+      <div class="rail-inner">
+        <div class="rail-head">
+          <span class="rail-pulse" aria-hidden="true"></span>
+          <span class="rail-label">The Table</span>
+        </div>
+        <p class="rail-line">{forum.line}</p>
+
+        <ul class="threads">
+          {forum.preview.map((t) => (
+            <li class="thread" data-hot={t.hot ? "true" : "false"}>
+              <span class="thread-title">{t.title}</span>
+              <span class="thread-count">{t.replies}</span>
+            </li>
+          ))}
+        </ul>
+
+        <a class="rail-enter" href={forum.href}>Enter The Table →</a>
+      </div>
+    </aside>
+  </div>
+</SiteFrame>
+
+<style>
+  .home {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 2.4rem;
+    align-items: start;
+  }
+
+  .feed-eyebrow {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin: 0 0 1.4rem;
+  }
+  .empty { color: var(--sage); font-style: italic; }
+
+  .card {
+    display: block;
+    padding: 1.5rem 0 1.7rem;
+    border-top: 1px solid var(--line);
+    transition: border-color 0.2s ease;
+  }
+  .card:first-of-type { border-top: none; }
+  .card:hover { border-color: var(--oxide); }
+  .card:hover .card-title { color: var(--oxide); }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-family: var(--mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin-bottom: 0.6rem;
+  }
+  .card-tag {
+    color: var(--oxide);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 0.1rem 0.5rem;
+  }
+  .card-title {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    line-height: 1.08;
+    margin: 0 0 0.5rem;
+    color: var(--snowmelt);
+    transition: color 0.2s ease;
+  }
+  .card-summary {
+    font-family: var(--body);
+    font-size: 1.05rem;
+    line-height: 1.5;
+    color: var(--sage);
+    margin: 0 0 0.7rem;
+    max-width: 60ch;
+  }
+  .card-read {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--oxide);
+  }
+
+  .rail { position: sticky; top: 84px; }
+  .rail-inner {
+    background: linear-gradient(180deg, var(--basalt-2) 0%, #171b1f 100%);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--oxide);
+    border-radius: 3px;
+    padding: 1.3rem 1.3rem 1.4rem;
+  }
+  .rail-head {
+    display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem;
+  }
+  .rail-label {
+    font-family: var(--display);
+    font-size: 1.5rem;
+    letter-spacing: 0.02em;
+    color: var(--snowmelt);
+  }
+  .rail-pulse {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--sage); opacity: 0.4; flex: none;
+  }
+  .rail[data-activity="live"] .rail-pulse {
+    background: var(--oxide); opacity: 1;
+    animation: railpulse 1.8s ease-out infinite;
+  }
+  @keyframes railpulse {
+    0%   { box-shadow: 0 0 0 0 rgba(192,90,46,0.55); }
+    70%  { box-shadow: 0 0 0 12px rgba(192,90,46,0); }
+    100% { box-shadow: 0 0 0 0 rgba(192,90,46,0); }
+  }
+  .rail-line {
+    font-family: var(--body);
+    font-size: 0.95rem; line-height: 1.45;
+    color: var(--sage); margin: 0 0 1.1rem;
+  }
+  .threads { list-style: none; margin: 0 0 1.2rem; padding: 0; }
+  .thread {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 0.8rem; padding: 0.6rem 0; border-top: 1px solid var(--line);
+  }
+  .thread-title {
+    font-family: var(--body); font-size: 0.95rem; line-height: 1.3;
+    color: var(--snowmelt);
+  }
+  .thread-count {
+    font-family: var(--mono); font-size: 0.7rem; color: var(--sage); flex: none;
+  }
+  .thread[data-hot="true"] .thread-count { color: var(--oxide); }
+  .rail-enter {
+    display: inline-block;
+    font-family: var(--mono); font-size: 0.7rem;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--oxide);
+  }
+  .rail-enter:hover { color: var(--snowmelt); }
+
+  @media (max-width: 860px) {
+    .home { grid-template-columns: 1fr; }
+    .rail { position: static; order: -1; margin-bottom: 1rem; }
+  }
+</style>

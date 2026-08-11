@@ -1,0 +1,85 @@
+---
+import { nav, site } from "../site.config";
+const path = Astro.url.pathname;
+---
+
+<header class="nav">
+  <a class="wordmark" href="/">{site.wordmark}</a>
+
+  <nav class="links" aria-label="Primary">
+    {nav.map((item) => {
+      const active = path === item.href || (item.href !== "/" && path.startsWith(item.href));
+      return (
+        <a
+          href={item.href}
+          class:list={["link", { center: item.center, active }]}
+          aria-current={active ? "page" : undefined}
+        >
+          {item.label}
+        </a>
+      );
+    })}
+  </nav>
+</header>
+
+<style>
+  .nav {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 1.1rem 1.6rem;
+    border-bottom: 1px solid var(--line);
+    background: rgba(20, 23, 26, 0.7);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
+    z-index: 40;
+  }
+
+  .wordmark {
+    font-family: var(--display);
+    font-size: 1.1rem;
+    letter-spacing: 0.04em;
+    color: var(--snowmelt);
+    justify-self: start;
+  }
+
+  .links {
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    gap: 1.6rem;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .link {
+    color: var(--sage);
+    padding: 0.3rem 0;
+    border-bottom: 1px solid transparent;
+    transition: color 0.2s ease, border-color 0.2s ease;
+    white-space: nowrap;
+  }
+  .link:hover { color: var(--snowmelt); }
+  .link.active { color: var(--snowmelt); border-bottom-color: var(--oxide); }
+
+  /* The Table — the centerpiece. Larger, oxide-lit, unmistakable. */
+  .link.center {
+    font-size: 0.92rem;
+    letter-spacing: 0.16em;
+    color: var(--snowmelt);
+    padding: 0.35rem 1rem;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .link.center:hover { border-color: var(--oxide); background: rgba(192, 90, 46, 0.06); }
+  .link.center.active { border-color: var(--oxide); }
+
+  @media (max-width: 680px) {
+    .nav { grid-template-columns: 1fr; gap: 0.9rem; justify-items: center; padding: 0.9rem 1rem; }
+    .wordmark { justify-self: center; }
+    .links { grid-column: 1; flex-wrap: wrap; justify-content: center; gap: 1rem; }
+  }
+</style>

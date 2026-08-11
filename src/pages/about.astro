@@ -1,0 +1,39 @@
+---
+import SiteFrame from "../layouts/SiteFrame.astro";
+---
+<SiteFrame title="About — SONNY">
+  <div class="doc">
+    <p class="eyebrow">About</p>
+    <h1 class="h1">A place to gather</h1>
+    <div class="body">
+      <p class="placeholder">
+        Your words go here. Replace this file's text with the About page you
+        write. This paragraph is a placeholder so the page isn't empty.
+      </p>
+      <p class="placeholder">
+        Edit <code>src/pages/about.astro</code> — swap this block for your copy,
+        commit, and push. The page keeps its type and layout automatically.
+      </p>
+    </div>
+  </div>
+</SiteFrame>
+
+<style>
+  .doc { max-width: 68ch; margin: 0 auto; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--sage); margin: 0 0 1rem;
+  }
+  .h1 {
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(2.4rem, 7vw, 3.8rem); line-height: 1.03;
+    margin: 0 0 1.6rem; color: var(--snowmelt);
+  }
+  .body { font-family: var(--body); font-size: 1.15rem; line-height: 1.7; color: var(--snowmelt); }
+  .body p { margin: 0 0 1.3rem; }
+  .placeholder { color: var(--sage); }
+  code {
+    font-family: var(--mono); font-size: 0.85em;
+    background: var(--basalt-2); padding: 0.1rem 0.4rem; border-radius: 2px;
+  }
+</style>

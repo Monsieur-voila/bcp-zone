@@ -1,0 +1,28 @@
+---
+import SiteFrame from "../layouts/SiteFrame.astro";
+---
+<SiteFrame title="Comms — SONNY">
+  <div class="doc">
+    <p class="eyebrow">Comms</p>
+    <h1 class="h1">Coming online</h1>
+    <p class="lede">
+      This channel is still being tuned. Check back — or find the conversation
+      at <a href="/forum">The Table</a>.
+    </p>
+  </div>
+</SiteFrame>
+
+<style>
+  .doc { max-width: 60ch; margin: 4vh auto 0; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--sage); margin: 0 0 1rem;
+  }
+  .h1 {
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(2.4rem, 7vw, 3.8rem); line-height: 1.03;
+    margin: 0 0 1.4rem; color: var(--snowmelt);
+  }
+  .lede { font-family: var(--body); font-size: 1.2rem; line-height: 1.6; color: var(--sage); }
+  .lede a { color: var(--oxide); text-decoration: underline; }
+</style>

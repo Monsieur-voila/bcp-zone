@@ -1,0 +1,133 @@
+---
+import Base from "./Base.astro";
+import Nav from "../components/Nav.astro";
+import { status } from "../site.config";
+interface Props {
+  title?: string;
+  description?: string;
+}
+const { title, description } = Astro.props;
+---
+
+<Base title={title} description={description}>
+  <Nav />
+
+  <!-- Wave divider: a straight line with a bright oxide pulse that
+       sweeps across it, left to right. Stops for reduced-motion. -->
+  <div class="wavediv" aria-hidden="true">
+    <span class="wavediv-pulse"></span>
+  </div>
+
+  <!-- The standing line, every page. Italic Newsreader, centered. -->
+  <p class="creed">
+    Protecting the vulnerable with Community Resilience
+    <span class="creed-sep">~</span> off-grid connections
+    <span class="creed-sep">~</span> Creative Power Solutions
+  </p>
+
+  <div class="page">
+    <slot />
+  </div>
+
+  <footer class="statusline" role="contentinfo">
+    <span class="dot" aria-hidden="true"></span>
+    <span class="k">now</span><span class="v">{status.now}</span>
+    <span class="sep" aria-hidden="true">/</span>
+    <span class="k">freq</span><span class="v">{status.freq}</span>
+    <span class="upd">upd {status.updated}</span>
+  </footer>
+</Base>
+
+<style>
+  /* ── WAVE DIVIDER ──────────────────────────────────────── */
+  .wavediv {
+    position: relative;
+    height: 1px;
+    width: 100%;
+    background: var(--line);           /* the straight divider */
+    overflow: hidden;
+  }
+  /* a short bright oxide segment that sweeps across the line */
+  .wavediv-pulse {
+    position: absolute;
+    top: -1px;                          /* sit over the 1px line */
+    left: 0;
+    height: 3px;
+    width: 120px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--oxide) 50%,
+      transparent 100%
+    );
+    filter: drop-shadow(0 0 4px rgba(192, 90, 46, 0.7));
+    animation: sweep 6s linear infinite;
+  }
+  @keyframes sweep {
+    0%   { transform: translateX(-120px); }
+    100% { transform: translateX(100vw); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wavediv-pulse { display: none; }  /* still line for reduced-motion */
+  }
+
+  /* ── CREED STRIP ───────────────────────────────────────── */
+  .creed {
+    margin: 0;
+    padding: 0.55rem 1.2rem;
+    text-align: center;
+    font-family: var(--body);
+    font-style: italic;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: var(--sage);
+    border-bottom: 1px solid var(--line);
+  }
+  .creed-sep { color: var(--oxide); font-style: normal; padding: 0 0.15rem; }
+
+  @media (max-width: 560px) {
+    .creed { font-size: 0.76rem; }
+  }
+
+  .page {
+    max-width: var(--wrap);
+    margin: 0 auto;
+    padding: 2.4rem 1.6rem 5rem;
+    min-height: 60vh;
+  }
+
+  .statusline {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    padding: 0.6rem 1.3rem;
+    background: rgba(20, 23, 26, 0.86);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    z-index: 30;
+  }
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--oxide); flex: none;
+    animation: breathe 3.4s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(192,90,46,0.45); opacity: 0.85; }
+    50%      { box-shadow: 0 0 0 5px rgba(192,90,46,0); opacity: 1; }
+  }
+  .k { color: var(--sage); text-transform: uppercase; font-size: 0.64rem; }
+  .v { color: var(--snowmelt); }
+  .sep { color: var(--line); }
+  .upd { margin-left: auto; color: var(--sage); opacity: 0.7; font-size: 0.64rem; }
+
+  @media (max-width: 560px) {
+    .upd { margin-left: 0; width: 100%; }
+  }
+</style>

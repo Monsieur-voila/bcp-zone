@@ -1,0 +1,91 @@
+---
+import SiteFrame from "../layouts/SiteFrame.astro";
+---
+<SiteFrame title="Contact / Tips — SONNY">
+  <div class="doc">
+    <p class="eyebrow">Contact / Tips</p>
+    <h1 class="h1">Send it over</h1>
+    <p class="lede">
+      A tip, a question, a photo, a recording. It comes straight to us —
+      privately. Nothing here is published without a choice on our end.
+    </p>
+
+    <!-- Shell only. Submission, uploads, and anti-bot are wired in Stage 3. -->
+    <form class="form" aria-label="Contact and tips" onsubmit="return false;">
+      <label class="field">
+        <span class="label">Your name <span class="opt">(optional)</span></span>
+        <input class="input" type="text" name="name" autocomplete="name" />
+      </label>
+
+      <label class="field">
+        <span class="label">Email <span class="opt">(if you want a reply)</span></span>
+        <input class="input" type="email" name="email" autocomplete="email" />
+      </label>
+
+      <label class="field">
+        <span class="label">What's on your mind</span>
+        <textarea class="input area" name="message" rows="6"></textarea>
+      </label>
+
+      <label class="field">
+        <span class="label">Attach a photo, video, or audio <span class="opt">(optional)</span></span>
+        <input class="input file" type="file" name="media"
+               accept="image/*,video/*,audio/*" multiple disabled />
+        <span class="note">Uploads switch on in the next build stage.</span>
+      </label>
+
+      <div class="turnstile-slot" aria-hidden="true">
+        <span class="note">Bot check appears here (Stage 3).</span>
+      </div>
+
+      <button class="send" type="submit" disabled>Send — coming soon</button>
+    </form>
+  </div>
+</SiteFrame>
+
+<style>
+  .doc { max-width: 60ch; margin: 0 auto; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--sage); margin: 0 0 1rem;
+  }
+  .h1 {
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(2.4rem, 7vw, 3.8rem); line-height: 1.03;
+    margin: 0 0 1.2rem; color: var(--snowmelt);
+  }
+  .lede {
+    font-family: var(--body); font-size: 1.15rem; line-height: 1.6;
+    color: var(--sage); margin: 0 0 2.4rem; max-width: 52ch;
+  }
+
+  .form { display: flex; flex-direction: column; gap: 1.4rem; }
+  .field { display: flex; flex-direction: column; gap: 0.5rem; }
+  .label {
+    font-family: var(--mono); font-size: 0.7rem;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--snowmelt);
+  }
+  .opt { color: var(--sage); text-transform: none; letter-spacing: 0; }
+  .input {
+    font-family: var(--body); font-size: 1rem; color: var(--snowmelt);
+    background: var(--basalt-2); border: 1px solid var(--line);
+    border-radius: 3px; padding: 0.7rem 0.8rem;
+  }
+  .input:focus { border-color: var(--oxide); outline: none; }
+  .area { resize: vertical; }
+  .file { padding: 0.6rem; color: var(--sage); }
+  .note { font-family: var(--mono); font-size: 0.64rem; color: var(--sage); }
+
+  .turnstile-slot {
+    border: 1px dashed var(--line); border-radius: 3px;
+    padding: 0.9rem; text-align: center;
+  }
+
+  .send {
+    font-family: var(--mono); font-size: 0.76rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--snowmelt); background: transparent;
+    border: 1px solid var(--line); border-radius: 3px;
+    padding: 0.8rem 1.4rem; cursor: not-allowed; align-self: flex-start;
+  }
+</style>

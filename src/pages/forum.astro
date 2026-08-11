@@ -1,0 +1,66 @@
+---
+import SiteFrame from "../layouts/SiteFrame.astro";
+import { forum } from "../site.config";
+---
+<SiteFrame title="The Table — SONNY" description="The community forum. Pull up a chair.">
+  <div class="table">
+    <div class="table-head">
+      <span class="pulse" aria-hidden="true"></span>
+      <h1 class="h1">The Table</h1>
+    </div>
+    <p class="lede">{forum.line}</p>
+
+    <!-- The live forum lands here. Auth (Google sign-in) and the
+         data-driven threads arrive in Stages 4–5. This is the shell. -->
+    <div class="board">
+      <ul class="threads">
+        {forum.preview.map((t) => (
+          <li class="thread" data-hot={t.hot ? "true" : "false"}>
+            <span class="t-title">{t.title}</span>
+            <span class="t-count">{t.replies} replies</span>
+          </li>
+        ))}
+      </ul>
+      <p class="soon">
+        Sign-in and live discussion switch on soon. For now, this is the room —
+        the chairs are being set.
+      </p>
+    </div>
+  </div>
+</SiteFrame>
+
+<style>
+  .table { max-width: 72ch; margin: 0 auto; }
+  .table-head { display: flex; align-items: center; gap: 0.8rem; }
+  .pulse {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--sage); opacity: 0.4; flex: none;
+  }
+  .h1 {
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(2.6rem, 8vw, 4.2rem); line-height: 1.02;
+    margin: 0; color: var(--snowmelt);
+  }
+  .lede {
+    font-family: var(--body); font-style: italic; font-size: 1.25rem;
+    color: var(--sage); margin: 1rem 0 2.4rem;
+  }
+  .board {
+    background: linear-gradient(180deg, var(--basalt-2) 0%, #171b1f 100%);
+    border: 1px solid var(--line); border-left: 2px solid var(--oxide);
+    border-radius: 3px; padding: 1.6rem 1.8rem 1.8rem;
+  }
+  .threads { list-style: none; margin: 0 0 1.4rem; padding: 0; }
+  .thread {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 1rem; padding: 0.9rem 0; border-top: 1px solid var(--line);
+  }
+  .thread:first-child { border-top: none; }
+  .t-title { font-family: var(--body); font-size: 1.1rem; color: var(--snowmelt); }
+  .t-count { font-family: var(--mono); font-size: 0.7rem; color: var(--sage); flex: none; }
+  .thread[data-hot="true"] .t-count { color: var(--oxide); }
+  .soon {
+    font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
+    color: var(--sage); margin: 0;
+  }
+</style>
