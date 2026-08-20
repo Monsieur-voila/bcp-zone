@@ -2,16 +2,14 @@
 // ─────────────────────────────────────────────────────────────
 //  AuthButton — Sign in with Google / signed-in state / sign out.
 //
-//  STAGE A: proves a real person can sign in and the site knows
-//  who they are. No forum logic yet.
-//
-//  The script block below runs entirely in the browser.
+//  COLOR KNOBS live at the top of the style block below.
+//  Change those variables to restyle the whole component.
 // ─────────────────────────────────────────────────────────────
 ---
 
 <div class="auth" data-auth-root>
   <!-- signed-out view -->
-  <button class="auth-btn" data-auth-signin hidden>
+  <button class="auth-btn" type="button" data-auth-signin hidden>
     <span class="g" aria-hidden="true">G</span>
     Sign in with Google
   </button>
@@ -22,7 +20,7 @@
       <span class="who-label">signed in as</span>
       <span class="who-name" data-auth-name>—</span>
     </span>
-    <button class="auth-out" data-auth-signout>Sign out</button>
+    <button class="auth-out" type="button" data-auth-signout>Sign out</button>
   </div>
 
   <!-- while we check the session -->
@@ -39,12 +37,10 @@
   const outEl    = root.querySelector("[data-auth-signout]");
   const waitEl   = root.querySelector("[data-auth-loading]");
 
-  // Show the right view for the current session.
   function render(session) {
     waitEl.hidden = true;
     if (session?.user) {
       const u = session.user;
-      // Prefer the person's name; fall back to email.
       nameEl.textContent =
         u.user_metadata?.full_name || u.user_metadata?.name || u.email || "friend";
       userEl.hidden = false;
@@ -55,14 +51,11 @@
     }
   }
 
-  // Check session on load.
   const { data } = await supabase.auth.getSession();
   render(data.session);
 
-  // React to sign in / sign out as it happens.
   supabase.auth.onAuthStateChange((_event, session) => render(session));
 
-  // Sign in — sends the person to Google, then back here.
   signInEl.addEventListener("click", async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -71,14 +64,33 @@
     if (error) console.error("[auth] sign-in failed:", error.message);
   });
 
-  // Sign out.
   outEl.addEventListener("click", async () => {
     const { error } = await supabase.auth.signOut();
     if (error) console.error("[auth] sign-out failed:", error.message);
+    // Don't wait on the auth event — update immediately.
+    render(null);
   });
 </script>
 
 <style>
+  /* ═══ COLOR KNOBS — change these to restyle ═══════════════
+     Each is a normal CSS color. Swap in any hex you like. */
+  .auth {
+    --auth-name-color:    #7aa7d9;   /* "Field Array" — the blue */
+    --auth-label-color:   var(--sage);
+    --auth-signout-color: #d9a441;   /* SIGN OUT — warm amber */
+    --auth-signout-hover: #f0c368;
+    --auth-google-g:      #4285F4;   /* the G — Google blue */
+    --auth-btn-text:      var(--snowmelt);
+    --auth-btn-border:    var(--line);
+    --auth-btn-hover:     var(--oxide);
+  }
+  /* ═════════════════════════════════════════════════════════ */
+
+  /* CRITICAL: makes the `hidden` attribute actually win over
+     display:flex etc. Without this the views stack on screen. */
+  [hidden] { display: none !important; }
+
   .auth {
     display: flex;
     align-items: center;
@@ -96,41 +108,60 @@
     font-size: 0.7rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--snowmelt);
+    color: var(--auth-btn-text);
     background: transparent;
-    border: 1px solid var(--line);
+    border: 1px solid var(--auth-btn-border);
     border-radius: 3px;
     padding: 0.5rem 0.9rem;
     cursor: pointer;
     transition: border-color 0.2s ease, background 0.2s ease;
   }
-  .auth-btn:hover { border-color: var(--oxide); background: rgba(192, 90, 46, 0.06); }
+  .auth-btn:hover {
+    border-color: var(--auth-btn-hover);
+    background: rgba(192, 90, 46, 0.06);
+  }
 
   .g {
     font-family: var(--display);
-    font-size: 0.95rem;
-    color: var(--oxide);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--auth-google-g);
     line-height: 1;
   }
 
-  .auth-in { display: flex; align-items: center; gap: 0.8rem; }
-  .who { display: flex; align-items: baseline; gap: 0.4rem; }
-  .who-label { color: var(--sage); text-transform: uppercase; font-size: 0.62rem; }
-  .who-name  { color: var(--snowmelt); font-size: 0.76rem; }
+  .auth-in { display: flex; align-items: center; gap: 1rem; }
+  .who { display: flex; align-items: baseline; gap: 0.45rem; }
+  .who-label {
+    color: var(--auth-label-color);
+    text-transform: uppercase;
+    font-size: 0.62rem;
+  }
+  .who-name {
+    color: var(--auth-name-color);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
 
+  /* SIGN OUT — more prominent: bordered, warm, its own presence */
   .auth-out {
     font-family: var(--mono);
-    font-size: 0.62rem;
-    letter-spacing: 0.1em;
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--sage);
+    color: var(--auth-signout-color);
     background: transparent;
-    border: none;
-    border-bottom: 1px solid transparent;
-    padding: 0.1rem 0;
+    border: 1px solid var(--auth-signout-color);
+    border-radius: 3px;
+    padding: 0.35rem 0.7rem;
     cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
   }
-  .auth-out:hover { color: var(--oxide); border-bottom-color: var(--oxide); }
+  .auth-out:hover {
+    color: var(--auth-signout-hover);
+    border-color: var(--auth-signout-hover);
+    background: rgba(217, 164, 65, 0.08);
+  }
 
   .auth-wait { color: var(--sage); opacity: 0.6; }
 </style>

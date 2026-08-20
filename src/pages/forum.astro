@@ -16,8 +16,10 @@ const sections = [
 <SiteFrame title="The Table — Blaine County Preparedness" description="The community forum. Pull up a chair.">
   <div class="table">
     <div class="table-head">
-      <span class="pulse" aria-hidden="true"></span>
-      <h1 class="h1">The Table</h1>
+      <div class="table-title-row">
+        <span class="pulse" aria-hidden="true"></span>
+        <h1 class="h1">The Table</h1>
+      </div>
       <div class="table-auth"><AuthButton /></div>
     </div>
     <p class="lede">{forum.line}</p>
@@ -45,8 +47,18 @@ const sections = [
 
 <style>
   .table { max-width: 72ch; margin: 0 auto; }
+  /* Heading block, centered over the sections below it. */
   .table-head {
-    display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
+    text-align: center;
+  }
+  .table-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
   }
   .pulse {
     width: 12px; height: 12px; border-radius: 50%;
@@ -57,11 +69,12 @@ const sections = [
     font-size: clamp(2.6rem, 8vw, 4.2rem); line-height: 1.02;
     margin: 0; color: var(--snowmelt);
   }
-  .table-auth { margin-left: auto; }
+  .table-auth { }
 
   .lede {
     font-family: var(--body); font-style: italic; font-size: 1.25rem;
     color: var(--sage); margin: 1rem 0 2.4rem;
+    text-align: center;
   }
 
   .sections { list-style: none; margin: 0 0 2rem; padding: 0; }
@@ -109,6 +122,6 @@ const sections = [
   }
 
   @media (max-width: 560px) {
-    .table-auth { margin-left: 0; width: 100%; }
+    .table-auth { width: 100%; display: flex; justify-content: center; }
   }
 </style>
