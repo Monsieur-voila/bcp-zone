@@ -8,3 +8,8 @@ package-lock.json
 # secrets — never commit
 .env
 .env.local
+
+# stray downloads
+files/
+authpdf/
+*.pdf
