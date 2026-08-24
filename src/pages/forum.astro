@@ -1,126 +1,102 @@
 ---
 import SiteFrame from "../layouts/SiteFrame.astro";
 import AuthButton from "../components/AuthButton.astro";
+import "../styles/heat.css";
+import "../styles/forum.css";
 import { forum } from "../site.config";
-
-// Sections of The Table. These will move into the database in Stage B;
-// listed here now so the page shape is right.
-const sections = [
-  { key: "preparedness",  label: "Preparedness",  blurb: "Resilience, off-grid, power, gear." },
-  { key: "signal-power",  label: "Signal & Power", blurb: "Radio, electronics, the things that carry a voice." },
-  { key: "land-water",    label: "Land & Water",   blurb: "The valley's ground and its water." },
-  { key: "briefs",        label: "Briefs",         blurb: "Short notices, calls for hands, time-sensitive." },
-  { key: "news",          label: "News",           blurb: "Discussion of posts from the front page." },
-];
 ---
 <SiteFrame title="The Table — Blaine County Preparedness" description="The community forum. Pull up a chair.">
   <div class="table">
     <div class="table-head">
       <div class="table-title-row">
-        <span class="pulse" aria-hidden="true"></span>
+        <span class="heat-dot" data-table-pulse></span>
         <h1 class="h1">The Table</h1>
       </div>
       <div class="table-auth"><AuthButton /></div>
     </div>
     <p class="lede">{forum.line}</p>
 
-    <!-- Sections. Each will show live thread counts and pulse by heat
-         once the database is wired (Stage B/E). -->
-    <ul class="sections">
-      {sections.map((s) => (
-        <li class="section" data-activity="quiet" style="--heat:0">
-          <span class="s-pulse" aria-hidden="true"></span>
-          <div class="s-text">
-            <span class="s-label">{s.label}</span>
-            <span class="s-blurb">{s.blurb}</span>
-          </div>
-          <span class="s-count">—</span>
-        </li>
-      ))}
+    <ul class="sections" data-sections>
+      <li class="loading">Opening the room…</li>
     </ul>
 
-    <p class="soon">
-      Sign in above to take a seat. Threads open here as the room is finished.
+    <p class="soon" data-empty hidden>
+      No threads yet. The chairs are set — someone has to speak first.
     </p>
   </div>
 </SiteFrame>
 
+<script>
+  import { getSections, heatState } from "../lib/forum";
+
+  const list = document.querySelector("[data-sections]");
+  const empty = document.querySelector("[data-empty]");
+  const tablePulse = document.querySelector("[data-table-pulse]");
+
+  const esc = (s) =>
+    String(s ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+
+  const sections = await getSections();
+
+  if (!sections.length) {
+    list.innerHTML = `<li class="loading">Sections not found.</li>`;
+  } else {
+    list.innerHTML = sections
+      .map((s) => {
+        const state = heatState(s.heat);
+        const count =
+          s.threadCount === 0
+            ? "—"
+            : `${s.threadCount} thread${s.threadCount === 1 ? "" : "s"}`;
+        return `
+          <li class="section heat-card" data-heat="${state}">
+            <a class="s-link" href="/forum/${esc(s.slug)}">
+              <span class="heat-dot"></span>
+              <span class="s-text">
+                <span class="s-label">${esc(s.label)}</span>
+                <span class="s-blurb">${esc(s.blurb ?? "")}</span>
+              </span>
+              <span class="s-count">${count}</span>
+            </a>
+            <span class="heat-rail" aria-hidden="true"></span>
+          </li>`;
+      })
+      .join("");
+
+    // The Table's own dot reflects the hottest section.
+    const peak = Math.max(...sections.map((s) => s.heat));
+    tablePulse.setAttribute("data-heat", heatState(peak));
+
+    const total = sections.reduce((n, s) => n + s.threadCount, 0);
+    if (total === 0) empty.hidden = false;
+  }
+</script>
+
 <style>
+  /* Only elements rendered by Astro (not injected by JS) belong here.
+     Section/thread card styling lives in src/styles/forum.css —
+     scoped styles can't reach runtime-injected markup. */
   .table { max-width: 72ch; margin: 0 auto; }
-  /* Heading block, centered over the sections below it. */
   .table-head {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.9rem;
-    text-align: center;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0.9rem; text-align: center;
   }
-  .table-title-row {
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-  }
-  .pulse {
-    width: 12px; height: 12px; border-radius: 50%;
-    background: var(--sage); opacity: 0.4; flex: none;
-  }
+  .table-title-row { display: flex; align-items: center; gap: 0.8rem; }
   .h1 {
     font-family: var(--display); font-weight: 400;
     font-size: clamp(2.6rem, 8vw, 4.2rem); line-height: 1.02;
     margin: 0; color: var(--snowmelt);
   }
-  .table-auth { }
-
   .lede {
     font-family: var(--body); font-style: italic; font-size: 1.25rem;
-    color: var(--sage); margin: 1rem 0 2.4rem;
-    text-align: center;
+    color: var(--sage); margin: 1rem 0 2.4rem; text-align: center;
   }
-
-  .sections { list-style: none; margin: 0 0 2rem; padding: 0; }
-  .section {
-    display: flex; align-items: center; gap: 1rem;
-    padding: 1.1rem 1.3rem;
-    background: linear-gradient(180deg, var(--basalt-2) 0%, #171b1f 100%);
-    border: 1px solid var(--line);
-    border-left: 2px solid var(--oxide);
-    border-radius: 3px;
-    margin-bottom: 0.7rem;
-    transition: border-color 0.2s ease, transform 0.2s ease;
-  }
-  .section:hover { border-color: var(--sage); transform: translateY(-1px); }
-
-  /* per-section pulse — inert until heat data arrives (Stage E) */
-  .s-pulse {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: var(--sage); opacity: 0.4; flex: none;
-  }
-  .section[data-activity="live"] .s-pulse {
-    background: var(--oxide); opacity: 1;
-    animation: spulse 1.8s ease-out infinite;
-  }
-  @keyframes spulse {
-    0%   { box-shadow: 0 0 0 0 rgba(192,90,46,0.55); }
-    70%  { box-shadow: 0 0 0 12px rgba(192,90,46,0); }
-    100% { box-shadow: 0 0 0 0 rgba(192,90,46,0); }
-  }
-
-  .s-text { display: flex; flex-direction: column; gap: 0.2rem; }
-  .s-label {
-    font-family: var(--display); font-size: 1.35rem;
-    letter-spacing: 0.02em; color: var(--snowmelt);
-  }
-  .s-blurb { font-family: var(--body); font-size: 0.92rem; color: var(--sage); }
-  .s-count {
-    margin-left: auto; font-family: var(--mono);
-    font-size: 0.7rem; color: var(--sage); flex: none;
-  }
-
   .soon {
     font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
-    color: var(--sage); margin: 0;
+    color: var(--sage); margin: 0; text-align: center;
   }
-
   @media (max-width: 560px) {
     .table-auth { width: 100%; display: flex; justify-content: center; }
   }

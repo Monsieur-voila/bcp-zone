@@ -1,0 +1,123 @@
+---
+import SiteFrame from "../../layouts/SiteFrame.astro";
+import AuthButton from "../../components/AuthButton.astro";
+import "../../styles/heat.css";
+import "../../styles/forum.css";
+
+// Static build needs to know the section URLs ahead of time.
+// These match the seeded rows in the database.
+export function getStaticPaths() {
+  return [
+    { params: { slug: "preparedness" } },
+    { params: { slug: "signal-power" } },
+    { params: { slug: "land-water" } },
+    { params: { slug: "briefs" } },
+    { params: { slug: "news" } },
+  ];
+}
+
+const { slug } = Astro.params;
+---
+<SiteFrame title="The Table — Blaine County Preparedness">
+  <div class="sec" data-slug={slug}>
+    <a class="back" href="/forum">← The Table</a>
+
+    <div class="sec-head">
+      <div class="sec-title-row">
+        <span class="heat-dot" data-sec-pulse></span>
+        <h1 class="h1" data-sec-label>…</h1>
+      </div>
+      <p class="blurb" data-sec-blurb></p>
+      <div class="sec-auth"><AuthButton /></div>
+    </div>
+
+    <ul class="threads" data-threads>
+      <li class="loading">Pulling up chairs…</li>
+    </ul>
+  </div>
+</SiteFrame>
+
+<script>
+  import { getSection, getThreads, heatState, ago } from "../../lib/forum";
+
+  const root   = document.querySelector("[data-slug]");
+  const slug   = root.dataset.slug;
+  const labelEl = document.querySelector("[data-sec-label]");
+  const blurbEl = document.querySelector("[data-sec-blurb]");
+  const pulseEl = document.querySelector("[data-sec-pulse]");
+  const list    = document.querySelector("[data-threads]");
+
+  const esc = (s) =>
+    String(s ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+
+  const section = await getSection(slug);
+  if (!section) {
+    labelEl.textContent = "Not found";
+    list.innerHTML = `<li class="loading">That room doesn't exist.</li>`;
+  } else {
+    labelEl.textContent = section.label;
+    blurbEl.textContent = section.blurb ?? "";
+    document.title = `${section.label} — The Table`;
+
+    const threads = await getThreads(section.id);
+
+    if (!threads.length) {
+      pulseEl.setAttribute("data-heat", "quiet");
+      list.innerHTML = `
+        <li class="empty">
+          Nothing here yet.${section.is_auto
+            ? " Threads appear as news posts are published."
+            : " Be the first to start something."}
+        </li>`;
+    } else {
+      const peak = Math.max(...threads.map((t) => t.heat));
+      pulseEl.setAttribute("data-heat", heatState(peak));
+
+      list.innerHTML = threads
+        .map((t) => {
+          const state = heatState(t.heat);
+          const replies =
+            t.replyCount === 0
+              ? "no replies"
+              : `${t.replyCount} repl${t.replyCount === 1 ? "y" : "ies"}`;
+          return `
+            <li class="thread heat-card" data-heat="${state}">
+              <span class="heat-dot"></span>
+              <span class="t-text">
+                <span class="t-title">${esc(t.title)}</span>
+                <span class="t-meta">${esc(t.author)} · ${replies} · ${ago(t.last_reply_at)}</span>
+              </span>
+              <span class="heat-rail" aria-hidden="true"></span>
+            </li>`;
+        })
+        .join("");
+    }
+  }
+</script>
+
+<style>
+  /* Thread card styling lives in src/styles/forum.css (unscoped),
+     because those cards are injected by JavaScript at runtime. */
+  .sec { max-width: 72ch; margin: 0 auto; }
+  .back {
+    font-family: var(--mono); font-size: 0.7rem;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--sage);
+  }
+  .back:hover { color: var(--oxide); }
+  .sec-head {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0.7rem; text-align: center; margin: 1.6rem 0 2.2rem;
+  }
+  .sec-title-row { display: flex; align-items: center; gap: 0.7rem; }
+  .h1 {
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(2.2rem, 7vw, 3.4rem); line-height: 1.03;
+    margin: 0; color: var(--snowmelt);
+  }
+  .blurb {
+    font-family: var(--body); font-style: italic; font-size: 1.05rem;
+    color: var(--sage); margin: 0;
+  }
+</style>

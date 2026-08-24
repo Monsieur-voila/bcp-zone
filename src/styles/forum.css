@@ -1,0 +1,102 @@
+/* ═══════════════════════════════════════════════════════════════
+   FORUM LAYOUT — sections, threads, rails.
+
+   These rules live in a plain .css file ON PURPOSE.
+   The section and thread cards are injected by JavaScript at
+   runtime, so Astro's scoped <style> blocks never reach them.
+   Plain CSS is not scoped, so it applies to everything.
+
+   Tune padding / sizes / spacing here.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── SECTION CARDS (The Table) ──────────────────────────────── */
+
+.sections { list-style: none; margin: 0 0 2rem; padding: 0; }
+
+.section {
+  background: linear-gradient(180deg, var(--basalt-2) 0%, #171b1f 100%);
+  margin-bottom: 0.9rem;
+  transition: transform 0.2s ease;
+}
+.section:hover { transform: translateY(-1px); }
+
+.s-link {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1.6rem 1.6rem;      /* KNOB: cushion inside the box */
+  text-decoration: none;
+}
+
+.s-text { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.s-label {
+  font-family: var(--display);
+  font-size: 1.6rem;           /* KNOB: section name size */
+  letter-spacing: 0.02em;
+  color: var(--snowmelt);
+}
+
+.s-blurb {
+  font-family: var(--body);
+  font-size: 0.95rem;
+  color: var(--sage);
+}
+
+.s-count {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--sage);
+  flex: none;
+}
+
+/* ── THREAD CARDS (inside a section) ────────────────────────── */
+
+.threads { list-style: none; margin: 0; padding: 0; }
+
+.thread {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.3rem 1.4rem;      /* KNOB: cushion inside thread box */
+  background: var(--basalt-2);
+  margin-bottom: 0.8rem;
+  transition: transform 0.2s ease;
+}
+.thread:hover { transform: translateY(-1px); }
+
+.t-text { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.t-title {
+  font-family: var(--body);
+  font-size: 1.12rem;
+  color: var(--snowmelt);
+  line-height: 1.3;
+}
+
+.t-meta {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  color: var(--sage);
+}
+
+/* ── SHARED STATES ──────────────────────────────────────────── */
+
+.loading, .empty {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--sage);
+  opacity: 0.8;
+  padding: 1.2rem 0;
+}
+
+/* ── HOMEPAGE RAIL THREADS ──────────────────────────────────── */
+
+.rail-loading {
+  color: var(--sage);
+  opacity: 0.7;
+  font-style: italic;
+}
