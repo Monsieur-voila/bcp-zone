@@ -1,0 +1,224 @@
+---
+// ─────────────────────────────────────────────────────────────
+//  ThreadComposer — "Start a thread".
+//
+//  Two modes, set by the `mode` prop:
+//    "section"  section comes from context; no picker.
+//    "picker"   shows a section chooser with blurbs, so a
+//               newcomer can tell Briefs from Preparedness.
+//
+//  Signed out, it invites sign-in instead of showing the form.
+// ─────────────────────────────────────────────────────────────
+interface Props {
+  mode?: "section" | "picker";
+  sectionId?: string;
+}
+const { mode = "section", sectionId = "" } = Astro.props;
+---
+
+<div class="composer" data-composer data-mode={mode} data-section-id={sectionId}>
+  <!-- signed out -->
+  <p class="signed-out" data-composer-signedout hidden>
+    Sign in to start a thread.
+  </p>
+
+  <!-- collapsed: the button -->
+  <button class="start-btn" type="button" data-composer-open hidden>
+    Start a thread
+  </button>
+
+  <!-- expanded: the form -->
+  <div class="form" data-composer-form hidden>
+    {mode === "picker" && (
+      <label class="field">
+        <span class="label">Which part of The Table?</span>
+        <select class="input select" data-composer-section></select>
+        <span class="hint" data-composer-hint></span>
+      </label>
+    )}
+
+    <label class="field">
+      <span class="label">Title</span>
+      <input class="input" type="text" maxlength="140"
+             placeholder="What's this about?" data-composer-title />
+    </label>
+
+    <label class="field">
+      <span class="label">Say more <span class="opt">(optional)</span></span>
+      <textarea class="input area" rows="5"
+                placeholder="Context, details, what you need."
+                data-composer-body></textarea>
+    </label>
+
+    <p class="notice" data-composer-notice hidden></p>
+
+    <div class="actions">
+      <button class="post-btn" type="button" data-composer-post>Post it</button>
+      <button class="cancel-btn" type="button" data-composer-cancel>Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { supabase } from "../lib/supabase";
+  import { createThread, currentUser } from "../lib/forum";
+
+  const root = document.querySelector("[data-composer]");
+  if (root) {
+    const mode      = root.dataset.mode;
+    const signedOut = root.querySelector("[data-composer-signedout]");
+    const openBtn   = root.querySelector("[data-composer-open]");
+    const form      = root.querySelector("[data-composer-form]");
+    const titleEl   = root.querySelector("[data-composer-title]");
+    const bodyEl    = root.querySelector("[data-composer-body]");
+    const noticeEl  = root.querySelector("[data-composer-notice]");
+    const postBtn   = root.querySelector("[data-composer-post]");
+    const cancelBtn = root.querySelector("[data-composer-cancel]");
+    const selectEl  = root.querySelector("[data-composer-section]");
+    const hintEl    = root.querySelector("[data-composer-hint]");
+
+    let sections = [];
+
+    function show(session) {
+      const inUser = !!session?.user;
+      signedOut.hidden = inUser;
+      openBtn.hidden = !inUser;
+      if (!inUser) form.hidden = true;
+    }
+
+    const { data } = await supabase.auth.getSession();
+    show(data.session);
+    supabase.auth.onAuthStateChange((_e, s) => show(s));
+
+    // Picker mode: load sections with their blurbs so the choice
+    // is self-explanatory for someone new.
+    if (mode === "picker" && selectEl) {
+      const { data: rows } = await supabase
+        .from("sections")
+        .select("id, label, blurb, sort_order")
+        .order("sort_order");
+      sections = rows ?? [];
+      selectEl.innerHTML = sections
+        .map((s) => `<option value="${s.id}">${s.label}</option>`)
+        .join("");
+      const setHint = () => {
+        const s = sections.find((x) => x.id === selectEl.value);
+        hintEl.textContent = s?.blurb ?? "";
+      };
+      selectEl.addEventListener("change", setHint);
+      setHint();
+    }
+
+    openBtn.addEventListener("click", () => {
+      form.hidden = false;
+      openBtn.hidden = true;
+      titleEl.focus();
+    });
+
+    cancelBtn.addEventListener("click", () => {
+      form.hidden = true;
+      openBtn.hidden = false;
+      noticeEl.hidden = true;
+      titleEl.value = "";
+      bodyEl.value = "";
+    });
+
+    postBtn.addEventListener("click", async () => {
+      // Read at click time — the section page fills this in
+      // after its data loads.
+      const sectionId =
+        mode === "picker" ? selectEl.value : root.dataset.sectionId;
+
+      if (!sectionId) {
+        noticeEl.textContent = "Pick a section first.";
+        noticeEl.hidden = false;
+        return;
+      }
+
+      postBtn.disabled = true;
+      postBtn.textContent = "Posting…";
+      noticeEl.hidden = true;
+
+      const res = await createThread(sectionId, titleEl.value, bodyEl.value);
+
+      postBtn.disabled = false;
+      postBtn.textContent = "Post it";
+
+      if (res.error) {
+        noticeEl.textContent = res.error;
+        noticeEl.hidden = false;
+        return;
+      }
+      window.location.href = `/forum/thread?id=${res.id}`;
+    });
+  }
+</script>
+
+<style>
+  .composer { margin: 0 0 2rem; }
+
+  .signed-out {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--sage); margin: 0; text-align: center;
+  }
+
+  .start-btn {
+    display: inline-flex; align-items: center;
+    font-family: var(--mono); font-size: 0.74rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--snowmelt); background: transparent;
+    border: 1px solid var(--oxide); border-radius: 3px;
+    padding: 0.7rem 1.2rem; cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  .start-btn:hover { background: rgba(192, 90, 46, 0.1); }
+
+  .form {
+    display: flex; flex-direction: column; gap: 1.1rem;
+    background: var(--basalt-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 1.5rem;
+  }
+  .field { display: flex; flex-direction: column; gap: 0.45rem; }
+  .label {
+    font-family: var(--mono); font-size: 0.66rem;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--snowmelt);
+  }
+  .opt { color: var(--sage); text-transform: none; letter-spacing: 0; }
+  .input {
+    font-family: var(--body); font-size: 1rem; color: var(--snowmelt);
+    background: var(--basalt); border: 1px solid var(--line);
+    border-radius: 3px; padding: 0.7rem 0.8rem;
+  }
+  .input:focus { border-color: var(--oxide); outline: none; }
+  .area { resize: vertical; line-height: 1.5; }
+  .select { cursor: pointer; }
+  .hint {
+    font-family: var(--body); font-style: italic;
+    font-size: 0.85rem; color: var(--sage);
+  }
+
+  .notice {
+    font-family: var(--mono); font-size: 0.7rem;
+    color: var(--heat-c4, #d93b1f); margin: 0;
+  }
+
+  .actions { display: flex; align-items: center; gap: 0.8rem; }
+  .post-btn {
+    font-family: var(--mono); font-size: 0.72rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--basalt); background: var(--oxide);
+    border: 1px solid var(--oxide); border-radius: 3px;
+    padding: 0.6rem 1.2rem; cursor: pointer;
+  }
+  .post-btn:hover { background: #d2683a; }
+  .post-btn:disabled { opacity: 0.6; cursor: default; }
+  .cancel-btn {
+    font-family: var(--mono); font-size: 0.66rem;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--sage); background: transparent;
+    border: none; cursor: pointer;
+  }
+  .cancel-btn:hover { color: var(--snowmelt); }
+</style>

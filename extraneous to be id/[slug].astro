@@ -1,7 +1,6 @@
 ---
 import SiteFrame from "../../layouts/SiteFrame.astro";
 import AuthButton from "../../components/AuthButton.astro";
-import ThreadComposer from "../../components/ThreadComposer.astro";
 import "../../styles/heat.css";
 import "../../styles/forum.css";
 
@@ -31,8 +30,6 @@ const { slug } = Astro.params;
       <p class="blurb" data-sec-blurb></p>
       <div class="sec-auth"><AuthButton /></div>
     </div>
-
-    <ThreadComposer mode="section" />
 
     <ul class="threads" data-threads>
       <li class="loading">Pulling up chairs…</li>
@@ -64,10 +61,6 @@ const { slug } = Astro.params;
     blurbEl.textContent = section.blurb ?? "";
     document.title = `${section.label} — The Table`;
 
-    // Hand the section id to the composer now that we know it.
-    const composerEl = document.querySelector("[data-composer]");
-    if (composerEl) composerEl.dataset.sectionId = section.id;
-
     const threads = await getThreads(section.id);
 
     if (!threads.length) {
@@ -91,13 +84,11 @@ const { slug } = Astro.params;
               : `${t.replyCount} repl${t.replyCount === 1 ? "y" : "ies"}`;
           return `
             <li class="thread heat-card" data-heat="${state}">
-              <a class="t-link" href="/forum/thread?id=${t.id}">
-                <span class="heat-dot"></span>
-                <span class="t-text">
-                  <span class="t-title">${esc(t.title)}</span>
-                  <span class="t-meta">${esc(t.author)} · ${replies} · ${ago(t.last_reply_at)}</span>
-                </span>
-              </a>
+              <span class="heat-dot"></span>
+              <span class="t-text">
+                <span class="t-title">${esc(t.title)}</span>
+                <span class="t-meta">${esc(t.author)} · ${replies} · ${ago(t.last_reply_at)}</span>
+              </span>
               <span class="heat-rail" aria-hidden="true"></span>
             </li>`;
         })
