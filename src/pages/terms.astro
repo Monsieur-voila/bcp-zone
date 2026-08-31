@@ -1,0 +1,126 @@
+---
+import SiteFrame from "../layouts/SiteFrame.astro";
+const updated = "August 30, 2026";
+---
+<SiteFrame title="Terms — Blaine County Preparedness"
+           description="How The Table works, and what's expected of everyone at it.">
+  <article class="doc">
+    <p class="eyebrow">Terms</p>
+    <h1 class="h1">How we sit at this table</h1>
+    <p class="updated">Last updated {updated}</p>
+
+    <p class="lede">
+      This is a neighbors' site. The rules are short because most of them
+      come down to not being the reason we need more rules.
+    </p>
+
+    <h2>Using the site</h2>
+    <p>
+      Anyone can read. To post, you sign in with a Google account. You're
+      responsible for what's posted from your account, so don't hand it
+      around.
+    </p>
+
+    <h2>What you write</h2>
+    <p>
+      What you post stays yours. By posting it here you're giving us
+      permission to show it on the site — nothing more. We don't claim
+      ownership and we won't sell it or license it to anyone.
+    </p>
+
+    <h2>What doesn't belong here</h2>
+    <ul>
+      <li>Harassment, threats, or targeting people</li>
+      <li>Hate directed at anyone for who they are</li>
+      <li>Spam, scams, or advertising you weren't invited to post</li>
+      <li>Other people's private information</li>
+      <li>Anything illegal, or instructions for doing harm</li>
+      <li>Impersonating someone else</li>
+    </ul>
+    <p>
+      Disagreement is welcome and expected — a preparedness forum where
+      everyone agrees isn't much use. Contempt is not the same as
+      disagreement.
+    </p>
+
+    <h2>Moderation</h2>
+    <p>
+      We can remove any post and block any account. We try to be light-handed
+      and we'd rather talk to someone than remove them. New accounts may have
+      their first post held briefly for review; this is about spam, not about
+      you.
+    </p>
+    <p>
+      If something needs attention, tell us. We'd rather hear from you than
+      find it a week later.
+    </p>
+
+    <h2>What this site isn't</h2>
+    <p>
+      Nothing here is professional advice — not medical, legal, engineering,
+      or emergency guidance. In a genuine emergency, call the people whose
+      job that is. Preparedness discussion is people sharing what they know,
+      which is valuable and is not the same as expertise.
+    </p>
+    <p>
+      We do our best to keep the site accurate and available, but we can't
+      guarantee either. Use your own judgment about anything you read here.
+    </p>
+
+    <h2>Your account</h2>
+    <p>
+      You can leave whenever you want and ask us to delete your account and
+      posts. We can close an account that's breaking these terms.
+    </p>
+
+    <h2>Changes</h2>
+    <p>
+      If these terms change meaningfully, we'll say so on the site rather
+      than quietly editing the page.
+    </p>
+
+    <h2>Getting in touch</h2>
+    <p>
+      Questions, reports, or anything else:
+      <a href="mailto:sonny@bcp.zone">sonny@bcp.zone</a>.
+    </p>
+    <p class="tail">
+      See also our <a href="/privacy">privacy policy</a>.
+    </p>
+  </article>
+</SiteFrame>
+
+<style>
+  .doc { max-width: 66ch; margin: 0 auto; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--sage); margin: 0 0 1rem;
+  }
+  .h1 {
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(2.2rem, 6vw, 3.2rem); line-height: 1.05;
+    margin: 0 0 0.6rem; color: var(--snowmelt);
+  }
+  .updated {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.08em; color: var(--sage); opacity: 0.7;
+    margin: 0 0 2rem;
+  }
+  .lede {
+    font-family: var(--body); font-style: italic; font-size: 1.2rem;
+    line-height: 1.6; color: var(--sage); margin: 0 0 2.4rem;
+  }
+  h2 {
+    font-family: var(--display); font-weight: 400; font-size: 1.5rem;
+    color: var(--snowmelt); margin: 2.2rem 0 0.7rem;
+  }
+  p, li {
+    font-family: var(--body); font-size: 1.05rem; line-height: 1.65;
+    color: var(--snowmelt);
+  }
+  p { margin: 0 0 1.1rem; }
+  ul { margin: 0 0 1.2rem; padding-left: 1.4rem; }
+  li { margin-bottom: 0.5rem; }
+  a { color: var(--oxide); text-decoration: underline; }
+  .tail { margin-top: 2rem; font-size: 0.95rem; color: var(--sage); }
+</style>

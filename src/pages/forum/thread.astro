@@ -192,6 +192,8 @@ import "../../styles/forum.css";
 </script>
 
 <style>
+  /* Admin controls and reply styling live in src/styles/forum.css
+     (unscoped) because they're injected by JavaScript at runtime. */
   .tp { max-width: 68ch; margin: 0 auto; }
   .back {
     font-family: var(--mono); font-size: 0.7rem;
@@ -199,42 +201,10 @@ import "../../styles/forum.css";
   }
   .back:hover { color: var(--oxide); }
 
-  .post { margin: 1.6rem 0 2.4rem; }
+  .post { margin: 1.6rem 0 2.6rem; }
   .t-h1 {
     font-family: var(--display); font-weight: 400;
     font-size: clamp(1.9rem, 5vw, 2.8rem); line-height: 1.08;
-    margin: 0 0 0.6rem; color: var(--snowmelt);
+    margin: 0 0 0.7rem; color: var(--snowmelt);
   }
-  .t-by {
-    font-family: var(--mono); font-size: 0.66rem;
-    letter-spacing: 0.08em; color: var(--sage); margin: 0 0 1.2rem;
-  }
-  .t-body {
-    font-family: var(--body); font-size: 1.1rem; line-height: 1.65;
-    color: var(--snowmelt); white-space: pre-wrap;
-  }
-
-  .admin {
-    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
-    margin-top: 1.6rem; padding-top: 1.2rem;
-    border-top: 1px dashed var(--line);
-  }
-  .admin-label {
-    font-family: var(--mono); font-size: 0.62rem;
-    letter-spacing: 0.1em; text-transform: uppercase; color: var(--sage);
-  }
-  .admin-select {
-    font-family: var(--body); font-size: 0.9rem; color: var(--snowmelt);
-    background: var(--basalt-2); border: 1px solid var(--line);
-    border-radius: 3px; padding: 0.35rem 0.5rem;
-  }
-  .admin-btn {
-    font-family: var(--mono); font-size: 0.62rem;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--sage); background: transparent;
-    border: 1px solid var(--line); border-radius: 3px;
-    padding: 0.35rem 0.7rem; cursor: pointer;
-  }
-  .admin-btn:hover { color: var(--snowmelt); border-color: var(--sage); }
-  .admin-btn.danger:hover { color: #d93b1f; border-color: #d93b1f; }
 </style>
