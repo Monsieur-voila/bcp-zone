@@ -1,0 +1,101 @@
+---
+import SiteFrame from "../layouts/SiteFrame.astro";
+import AuthButton from "../components/AuthButton.astro";
+---
+<SiteFrame title="Tips — Blaine County Preparedness">
+  <div class="inbox">
+    <p class="eyebrow">Private inbox</p>
+    <h1 class="h1">Tips</h1>
+
+    <!-- Not admin: nothing to see. The page reveals nothing about
+         what's here, and RLS blocks the data regardless. -->
+    <div class="locked" data-locked hidden>
+      <p class="locked-p">This page is for site administrators.</p>
+      <AuthButton />
+    </div>
+
+    <p class="loading" data-loading>Checking…</p>
+
+    <div class="list" data-list hidden></div>
+  </div>
+</SiteFrame>
+
+<script>
+  import { myProfile, getTips, markTipRead, archiveTip, ago } from "../lib/forum";
+
+  const esc = (s) =>
+    String(s ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+
+  const loading = document.querySelector("[data-loading]");
+  const locked  = document.querySelector("[data-locked]");
+  const list    = document.querySelector("[data-list]");
+
+  const profile = await myProfile();
+
+  if (!profile?.is_admin) {
+    loading.hidden = true;
+    locked.hidden = false;
+  } else {
+    const tips = await getTips();
+    loading.hidden = true;
+    list.hidden = false;
+
+    if (!tips.length) {
+      list.innerHTML = `<p class="empty">Nothing yet.</p>`;
+    } else {
+      const unread = tips.filter((t) => !t.is_read).length;
+      list.innerHTML = `
+        <p class="count">${tips.length} message${tips.length === 1 ? "" : "s"}${
+          unread ? ` · ${unread} unread` : ""
+        }</p>` + tips.map((t) => `
+        <article class="tip${t.is_read ? "" : " unread"}">
+          <div class="tip-head">
+            <span class="tip-who">${esc(t.name || "no name given")}</span>
+            <span class="tip-when">${ago(t.created_at)}</span>
+          </div>
+          ${t.email
+            ? `<a class="tip-email" href="mailto:${esc(t.email)}">${esc(t.email)}</a>`
+            : `<span class="tip-noemail">no reply address</span>`}
+          <div class="tip-body">${esc(t.message)}</div>
+          <div class="tip-acts">
+            <button class="tip-btn" data-read="${t.id}" data-state="${t.is_read}">
+              ${t.is_read ? "Mark unread" : "Mark read"}
+            </button>
+            <button class="tip-btn" data-archive="${t.id}">Archive</button>
+          </div>
+        </article>`).join("");
+
+      list.querySelectorAll("[data-read]").forEach((b) =>
+        b.addEventListener("click", async () => {
+          await markTipRead(b.dataset.read, b.dataset.state !== "true");
+          location.reload();
+        }));
+      list.querySelectorAll("[data-archive]").forEach((b) =>
+        b.addEventListener("click", async () => {
+          if (!confirm("Archive this message?")) return;
+          await archiveTip(b.dataset.archive);
+          location.reload();
+        }));
+    }
+  }
+</script>
+
+<style>
+  .inbox { max-width: 68ch; margin: 0 auto; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--sage); margin: 0 0 0.8rem;
+  }
+  .h1 {
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(2.2rem, 6vw, 3.2rem); line-height: 1.03;
+    margin: 0 0 2rem; color: var(--snowmelt);
+  }
+  .loading, .locked-p {
+    font-family: var(--mono); font-size: 0.74rem;
+    color: var(--sage); margin: 0 0 1.2rem;
+  }
+  .locked { display: flex; flex-direction: column; gap: 0.8rem; align-items: flex-start; }
+</style>

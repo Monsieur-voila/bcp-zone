@@ -398,3 +398,50 @@ export async function hideReply(replyId: string) {
     .eq("id", replyId);
   return error ? { error: error.message } : { ok: true };
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  TIPS — the private contact inbox
+// ═══════════════════════════════════════════════════════════════
+
+export async function sendTip(name: string, email: string, message: string) {
+  const clean = message.trim();
+  if (clean.length < 2) return { error: "Tell us a little more." };
+  if (clean.length > 5000) return { error: "That's too long (5000 max)." };
+
+  const e = email.trim();
+  if (e && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
+    return { error: "That email doesn't look right." };
+  }
+
+  const { error } = await supabase.from("tips").insert({
+    name: name.trim() || null,
+    email: e || null,
+    message: clean,
+  });
+
+  if (error) return { error: "Something went wrong sending that." };
+  return { ok: true };
+}
+
+export async function getTips() {
+  const { data, error } = await supabase
+    .from("tips")
+    .select("id, name, email, message, is_read, is_archived, created_at")
+    .eq("is_archived", false)
+    .order("created_at", { ascending: false });
+
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function markTipRead(id: string, read = true) {
+  const { error } = await supabase
+    .from("tips").update({ is_read: read }).eq("id", id);
+  return error ? { error: error.message } : { ok: true };
+}
+
+export async function archiveTip(id: string) {
+  const { error } = await supabase
+    .from("tips").update({ is_archived: true }).eq("id", id);
+  return error ? { error: error.message } : { ok: true };
+}

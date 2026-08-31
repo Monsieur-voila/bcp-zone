@@ -1,47 +1,96 @@
 ---
 import SiteFrame from "../layouts/SiteFrame.astro";
 ---
-<SiteFrame title="Contact / Tips — SONNY">
+<SiteFrame title="Contact / Tips — Blaine County Preparedness"
+           description="Send a tip, a question, or something you think we should know.">
   <div class="doc">
     <p class="eyebrow">Contact / Tips</p>
     <h1 class="h1">Send it over</h1>
     <p class="lede">
-      A tip, a question, a photo, a recording. It comes straight to us —
-      privately. Nothing here is published without a choice on our end.
+      A tip, a question, something you think the valley should know. It comes
+      straight to us — privately. Nothing here is published unless we ask you
+      first.
     </p>
 
-    <!-- Shell only. Submission, uploads, and anti-bot are wired in Stage 3. -->
-    <form class="form" aria-label="Contact and tips" onsubmit="return false;">
+    <div class="form" data-tipform>
       <label class="field">
         <span class="label">Your name <span class="opt">(optional)</span></span>
-        <input class="input" type="text" name="name" autocomplete="name" />
+        <input class="input" type="text" maxlength="120"
+               autocomplete="name" data-tip-name />
       </label>
 
       <label class="field">
         <span class="label">Email <span class="opt">(if you want a reply)</span></span>
-        <input class="input" type="email" name="email" autocomplete="email" />
+        <input class="input" type="email" maxlength="200"
+               autocomplete="email" data-tip-email />
       </label>
 
       <label class="field">
         <span class="label">What's on your mind</span>
-        <textarea class="input area" name="message" rows="6"></textarea>
+        <textarea class="input area" rows="7" maxlength="5000"
+                  data-tip-message></textarea>
       </label>
 
-      <label class="field">
-        <span class="label">Attach a photo, video, or audio <span class="opt">(optional)</span></span>
-        <input class="input file" type="file" name="media"
-               accept="image/*,video/*,audio/*" multiple disabled />
-        <span class="note">Uploads switch on in the next build stage.</span>
-      </label>
+      <p class="notice" data-tip-notice hidden></p>
 
-      <div class="turnstile-slot" aria-hidden="true">
-        <span class="note">Bot check appears here (Stage 3).</span>
-      </div>
+      <button class="send" type="button" data-tip-send>Send</button>
 
-      <button class="send" type="submit" disabled>Send — coming soon</button>
-    </form>
+      <p class="foot-hint">
+        Photos, video, and audio are coming soon. For now, if you have media,
+        mention it here and we'll write back with a way to send it.
+      </p>
+    </div>
+
+    <!-- shown after a successful send -->
+    <div class="thanks" data-tip-thanks hidden>
+      <p class="thanks-h">Got it.</p>
+      <p class="thanks-p">
+        Thanks for sending that over. If you left an email, we'll be in touch.
+      </p>
+      <button class="again" type="button" data-tip-again>Send something else</button>
+    </div>
   </div>
 </SiteFrame>
+
+<script>
+  import { sendTip } from "../lib/forum";
+
+  const form    = document.querySelector("[data-tipform]");
+  const thanks  = document.querySelector("[data-tip-thanks]");
+  const nameEl  = document.querySelector("[data-tip-name]");
+  const emailEl = document.querySelector("[data-tip-email]");
+  const msgEl   = document.querySelector("[data-tip-message]");
+  const notice  = document.querySelector("[data-tip-notice]");
+  const sendBtn = document.querySelector("[data-tip-send]");
+  const again   = document.querySelector("[data-tip-again]");
+
+  sendBtn.addEventListener("click", async () => {
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    notice.hidden = true;
+
+    const res = await sendTip(nameEl.value, emailEl.value, msgEl.value);
+
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Send";
+
+    if (res.error) {
+      notice.textContent = res.error;
+      notice.hidden = false;
+      return;
+    }
+
+    nameEl.value = ""; emailEl.value = ""; msgEl.value = "";
+    form.hidden = true;
+    thanks.hidden = false;
+  });
+
+  again.addEventListener("click", () => {
+    thanks.hidden = true;
+    form.hidden = false;
+    msgEl.focus();
+  });
+</script>
 
 <style>
   .doc { max-width: 60ch; margin: 0 auto; }
@@ -56,7 +105,7 @@ import SiteFrame from "../layouts/SiteFrame.astro";
   }
   .lede {
     font-family: var(--body); font-size: 1.15rem; line-height: 1.6;
-    color: var(--sage); margin: 0 0 2.4rem; max-width: 52ch;
+    color: var(--sage); margin: 0 0 2.6rem; max-width: 52ch;
   }
 
   .form { display: flex; flex-direction: column; gap: 1.4rem; }
@@ -69,23 +118,48 @@ import SiteFrame from "../layouts/SiteFrame.astro";
   .input {
     font-family: var(--body); font-size: 1rem; color: var(--snowmelt);
     background: var(--basalt-2); border: 1px solid var(--line);
-    border-radius: 3px; padding: 0.7rem 0.8rem;
+    border-radius: 3px; padding: 0.75rem 0.85rem;
   }
   .input:focus { border-color: var(--oxide); outline: none; }
-  .area { resize: vertical; }
-  .file { padding: 0.6rem; color: var(--sage); }
-  .note { font-family: var(--mono); font-size: 0.64rem; color: var(--sage); }
+  .area { resize: vertical; line-height: 1.55; }
 
-  .turnstile-slot {
-    border: 1px dashed var(--line); border-radius: 3px;
-    padding: 0.9rem; text-align: center;
+  .notice {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: #d93b1f; margin: 0;
   }
 
   .send {
+    align-self: flex-start;
     font-family: var(--mono); font-size: 0.76rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--basalt); background: var(--oxide);
+    border: 1px solid var(--oxide); border-radius: 3px;
+    padding: 0.75rem 1.6rem; cursor: pointer;
+    transition: background 0.2s ease;
+  }
+  .send:hover { background: #d2683a; }
+  .send:disabled { opacity: 0.6; cursor: default; }
+
+  .foot-hint {
+    font-family: var(--body); font-size: 0.88rem; line-height: 1.5;
+    color: var(--sage); opacity: 0.8; margin: 0.4rem 0 0;
+  }
+
+  .thanks { padding: 2rem 0; }
+  .thanks-h {
+    font-family: var(--display); font-size: 2rem;
+    color: var(--snowmelt); margin: 0 0 0.6rem;
+  }
+  .thanks-p {
+    font-family: var(--body); font-size: 1.1rem; line-height: 1.6;
+    color: var(--sage); margin: 0 0 1.6rem;
+  }
+  .again {
+    font-family: var(--mono); font-size: 0.7rem;
     letter-spacing: 0.12em; text-transform: uppercase;
     color: var(--snowmelt); background: transparent;
     border: 1px solid var(--line); border-radius: 3px;
-    padding: 0.8rem 1.4rem; cursor: not-allowed; align-self: flex-start;
+    padding: 0.6rem 1.1rem; cursor: pointer;
   }
+  .again:hover { border-color: var(--oxide); }
 </style>
