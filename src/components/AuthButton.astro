@@ -14,6 +14,12 @@
     Sign in with Google
   </button>
 
+  <!-- terms notice, shown only when signed out -->
+  <p class="terms-note" data-auth-terms hidden>
+    Signing in means you agree to our
+    <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.
+  </p>
+
   <!-- signed-in view -->
   <div class="auth-in" data-auth-user hidden>
     <span class="who">
@@ -36,6 +42,7 @@
   const nameEl   = root.querySelector("[data-auth-name]");
   const outEl    = root.querySelector("[data-auth-signout]");
   const waitEl   = root.querySelector("[data-auth-loading]");
+  const termsEl  = root.querySelector("[data-auth-terms]");
 
   function render(session) {
     waitEl.hidden = true;
@@ -45,9 +52,11 @@
         u.user_metadata?.full_name || u.user_metadata?.name || u.email || "friend";
       userEl.hidden = false;
       signInEl.hidden = true;
+      if (termsEl) termsEl.hidden = true;
     } else {
       userEl.hidden = true;
       signInEl.hidden = false;
+      if (termsEl) termsEl.hidden = false;
     }
   }
 
@@ -94,6 +103,8 @@
   .auth {
     display: flex;
     align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
     gap: 0.7rem;
     font-family: var(--mono);
     font-size: 0.7rem;
@@ -164,4 +175,19 @@
   }
 
   .auth-wait { color: var(--sage); opacity: 0.6; }
+
+  /* Quiet, but present — people should know what they're agreeing to. */
+  .terms-note {
+    font-family: var(--body);
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--sage);
+    margin: 0;
+    max-width: 30ch;
+  }
+  .terms-note a {
+    color: #e0c85a;
+    border-bottom: 1px solid rgba(224, 200, 90, 0.4);
+  }
+  .terms-note a:hover { color: #f5e08a; border-bottom-color: #f5e08a; }
 </style>

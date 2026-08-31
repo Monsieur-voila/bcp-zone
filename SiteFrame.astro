@@ -28,7 +28,9 @@ const { title, description } = Astro.props;
   <div class="page">
     <slot />
   </div>
-    <!-- Site footer: the standing links. -->
+
+  <!-- Site footer: the standing links. Deliberately visible —
+       a civic site should make its policies easy to find. -->
   <footer class="sitefoot">
     <nav class="foot-links" aria-label="Site information">
       <a href="/about">About</a>
@@ -110,10 +112,12 @@ const { title, description } = Astro.props;
     padding: 2.4rem 1.6rem 5rem;
     min-height: 60vh;
   }
-    /* ── SITE FOOTER ──────────────────────────────────────────
-     KNOB: --foot-link is the link colour. */
+
+  /* ── SITE FOOTER ───────────────────────────────────────────
+     KNOB: --foot-link is the link colour. Brighter than the
+     body sage so the policies are genuinely findable. */
   .sitefoot {
-    --foot-link: #e0c85a;
+    --foot-link: #e0c85a;          /* brighter yellow */
     --foot-link-hover: #f5e08a;
     border-top: 1px solid var(--line);
     margin-top: 4rem;
