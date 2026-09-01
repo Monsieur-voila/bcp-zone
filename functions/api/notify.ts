@@ -13,6 +13,17 @@
 //  notification must never block a tip from being saved.
 // ─────────────────────────────────────────────────────────────
 
+// ── CONFIG ───────────────────────────────────────────────────
+//  Set directly here rather than via environment variables.
+//  Cloudflare's variables were not reaching this Function, and a
+//  notification topic is not a meaningful secret — the worst a
+//  leak allows is someone sending you junk notifications. It
+//  grants no access to tips, the database, or anything else.
+//
+//  To change where notifications go, edit these two lines.
+const NTFY_URL = "https://ntfy.sh";
+const NTFY_TOPIC = "k0mme_thr3ceb";
+
 interface Env {
   NTFY_URL?: string;
   NTFY_TOPIC?: string;
@@ -25,11 +36,14 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       headers: { "content-type": "application/json" },
     });
 
-  const base = ctx.env.NTFY_URL;
-  const topic = ctx.env.NTFY_TOPIC;
+  // Environment variables win if present; otherwise fall back to
+  // the constants above.
+  const base = ctx.env.NTFY_URL || NTFY_URL;
+  const topic = ctx.env.NTFY_TOPIC || NTFY_TOPIC;
 
-  // Not configured — succeed silently. The tip is already saved.
-  if (!base || !topic) return ok({ sent: false, reason: "not configured" });
+  if (!base || !topic || topic === "REPLACE_WITH_YOUR_TOPIC") {
+    return ok({ sent: false, reason: "not configured" });
+  }
 
   try {
     const body = await ctx.request.json<{
@@ -51,7 +65,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
 
     const reply = body.email ? `\nreply: ${body.email}` : "";
 
-    await fetch(`${base.replace(/\/$/, "")}/${topic}`, {
+    const res = await fetch(`${base.replace(/\/$/, "")}/${topic}`, {
       method: "POST",
       headers: {
         // ntfy reads these headers for the notification's shape.
@@ -63,9 +77,10 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       body: `${preview}${extras}${reply}`,
     });
 
-    return ok({ sent: true });
-  } catch {
-    // Never let a notification failure surface to the sender.
-    return ok({ sent: false, reason: "error" });
+    return ok({ sent: res.ok, status: res.status });
+  } catch (e) {
+    // Never let a notification failure surface to the sender,
+    // but do report it so it can be diagnosed.
+    return ok({ sent: false, reason: String(e?.message || e) });
   }
 };
