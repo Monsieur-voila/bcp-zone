@@ -78,6 +78,11 @@ import { forum } from "../site.config";
 </script>
 
 <style>
+  /* An explicit `display` beats the `hidden` attribute, so without
+     this, elements meant to be hidden stay on screen. */
+  [hidden] { display: none !important; }
+
+
   /* Only elements rendered by Astro (not injected by JS) belong here.
      Section/thread card styling lives in src/styles/forum.css —
      scoped styles can't reach runtime-injected markup. */

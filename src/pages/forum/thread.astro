@@ -192,6 +192,11 @@ import "../../styles/forum.css";
 </script>
 
 <style>
+  /* An explicit `display` beats the `hidden` attribute, so without
+     this, elements meant to be hidden stay on screen. */
+  [hidden] { display: none !important; }
+
+
   /* Admin controls and reply styling live in src/styles/forum.css
      (unscoped) because they're injected by JavaScript at runtime. */
   .tp { max-width: 68ch; margin: 0 auto; }

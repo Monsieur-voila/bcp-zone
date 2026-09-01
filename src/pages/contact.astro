@@ -1,6 +1,7 @@
 ---
 import SiteFrame from "../layouts/SiteFrame.astro";
 import VoiceRecorder from "../components/VoiceRecorder.astro";
+import "../styles/forum.css";
 ---
 <SiteFrame title="Contact / Tips — Blaine County Preparedness"
            description="Send a tip, a question, or something you think we should know.">
@@ -179,6 +180,11 @@ import VoiceRecorder from "../components/VoiceRecorder.astro";
 </script>
 
 <style>
+  /* An explicit `display` beats the `hidden` attribute, so without
+     this, elements meant to be hidden stay on screen. */
+  [hidden] { display: none !important; }
+
+
   .doc { max-width: 60ch; margin: 0 auto; }
   .eyebrow {
     font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.2em;

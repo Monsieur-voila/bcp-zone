@@ -1,6 +1,8 @@
 ---
 import SiteFrame from "../layouts/SiteFrame.astro";
 import AuthButton from "../components/AuthButton.astro";
+import "../styles/heat.css";
+import "../styles/forum.css";
 ---
 <SiteFrame title="Tips — Blaine County Preparedness">
   <div class="inbox">
@@ -163,6 +165,10 @@ import AuthButton from "../components/AuthButton.astro";
 </script>
 
 <style>
+  /* An explicit `display` beats the `hidden` attribute, so without
+     this the loading, locked, and list states stack on screen. */
+  [hidden] { display: none !important; }
+
   .inbox { max-width: 68ch; margin: 0 auto; }
   .eyebrow {
     font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.2em;
