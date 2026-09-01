@@ -15,3 +15,7 @@ authpdf/
 *.pdf
 .wrangler/
 dist/
+
+# database dumps — never commit
+backup-*.sql
+*.dump
