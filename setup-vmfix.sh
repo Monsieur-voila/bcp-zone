@@ -1,3 +1,12 @@
+#!/usr/bin/env bash
+# Voice recorder fix — run from ~/site on the uploads branch
+set -e
+if [ ! -f package.json ]; then echo "ERROR: run from ~/site"; exit 1; fi
+echo "Writing..."
+mkdir -p src/components
+
+echo "  src/components/VoiceRecorder.astro"
+cat > 'src/components/VoiceRecorder.astro' << 'VMFIX_EOF'
 ---
 // ─────────────────────────────────────────────────────────────
 //  VoiceRecorder — leave a message, like a voicemail.
@@ -341,3 +350,29 @@
     .vm-dot { animation: none; }
   }
 </style>
+VMFIX_EOF
+
+echo "  package.json"
+cat > 'package.json' << 'VMFIX_EOF'
+{
+  "name": "bcp-zone",
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "dev:full": "astro build && wrangler pages dev dist --r2 TIPS_BUCKET --compatibility-date=2026-08-08"
+  },
+  "dependencies": {
+    "astro": "^4.16.0",
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}
+VMFIX_EOF
+
+echo ""
+echo "Then: git add -A && git commit -m \"voice recorder fix\" && git push"
