@@ -67,7 +67,7 @@ import "../styles/forum.css";
 </SiteFrame>
 
 <script>
-  import { sendTipWithFiles, uploadFile, UPLOAD_LIMITS, kindOf } from "../lib/forum";
+  import { sendTipWithFiles, uploadFile, UPLOAD_LIMITS, kindOf, notifyTip } from "../lib/forum";
 
   const form    = document.querySelector("[data-tipform]");
   const thanks  = document.querySelector("[data-tip-thanks]");
@@ -164,6 +164,15 @@ import "../styles/forum.css";
       notice.hidden = false;
       return;
     }
+
+    // Tell Sonny a tip landed. Fire-and-forget.
+    notifyTip({
+      name: nameEl.value,
+      email: emailEl.value,
+      message: msgEl.value,
+      attachments: chosen.length,
+      hasVoicemail: !!(vmEl && vmEl._recording),
+    });
 
     nameEl.value = ""; emailEl.value = ""; msgEl.value = "";
     chosen = []; drawList();
