@@ -1,7 +1,9 @@
 import { defineConfig } from "astro/config";
 
-// Static output for Cloudflare Pages. No adapter needed for a static site;
-// this also keeps local builds working on any platform (incl. Termux).
+// Static output. The /functions directory is picked up by
+// Cloudflare Pages directly — it does NOT require the Astro
+// Cloudflare adapter, and keeping the site static avoids the
+// build complications the adapter introduced previously.
 export default defineConfig({
   output: "static",
 });

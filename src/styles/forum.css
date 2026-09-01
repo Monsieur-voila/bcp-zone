@@ -394,3 +394,58 @@
 }
 .tip:hover .tip-btn { opacity: 1; }
 .tip-btn:hover { color: var(--snowmelt); border-color: var(--sage); }
+
+/* ── TIP ATTACHMENTS (admin inbox) ──────────────────────────── */
+
+.tip-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+.tip-shot {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--basalt);
+  cursor: zoom-in;
+  transition: border-color 0.2s ease;
+}
+.tip-shot:hover { border-color: var(--oxide); }
+.tip-shot-fail {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--sage);
+  opacity: 0.6;
+}
+
+/* voicemail in the inbox — highlighted, because it's the channel
+   we most want people using */
+.tip-voice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  background: rgba(224, 163, 60, 0.06);
+  border: 1px solid rgba(224, 163, 60, 0.5);
+  border-radius: 3px;
+  margin-bottom: 0.6rem;
+}
+.tip-voice-tag {
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e0a33c;
+}
+.tip-audio { width: 100%; }
+.tip-media { display: inline-block; }
+.tip-video {
+  max-width: 320px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #000;
+}

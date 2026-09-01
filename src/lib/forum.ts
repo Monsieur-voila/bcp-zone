@@ -445,3 +445,91 @@ export async function archiveTip(id: string) {
     .from("tips").update({ is_archived: true }).eq("id", id);
   return error ? { error: error.message } : { ok: true };
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  TIP ATTACHMENTS
+//  Files go to a private R2 bucket via a server Function.
+//  Only object keys are stored here — never public URLs.
+// ═══════════════════════════════════════════════════════════════
+
+export const UPLOAD_LIMITS = {
+  image: 25 * 1024 * 1024,     // 25MB per photo
+  video: 150 * 1024 * 1024,    // 150MB per video
+  audio: 25 * 1024 * 1024,     // 25MB — 5 min of voice is ~3MB
+  totalPerTip: 250 * 1024 * 1024,
+  accept: "image/*,video/*,audio/*",
+};
+
+export function kindOf(file: File): "image" | "video" | "audio" | null {
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type.startsWith("video/")) return "video";
+  if (file.type.startsWith("audio/")) return "audio";
+  return null;
+}
+
+export async function uploadFile(file: File) {
+  const kind = kindOf(file);
+  if (!kind) return { error: `${file.name} isn't a photo, video, or audio file.` };
+  if (file.size > UPLOAD_LIMITS[kind]) {
+    const mb = Math.round(UPLOAD_LIMITS[kind] / 1048576);
+    return { error: `${file.name} is over ${mb}MB.` };
+  }
+  const body = new FormData();
+  body.append("file", file);
+
+  try {
+    const res = await fetch("/api/upload", { method: "POST", body });
+    const data = await res.json();
+    if (!res.ok) return { error: data?.error ?? "Upload failed." };
+    return { key: data.key };
+  } catch {
+    return { error: "Upload failed — check your connection." };
+  }
+}
+
+// Fetch a private attachment as a blob URL (admin only).
+// The Function verifies admin status server-side on every call.
+export async function attachmentUrl(key: string): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`/api/attachment?key=${encodeURIComponent(key)}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
+}
+
+// Send a tip with optional image attachments.
+export async function sendTipWithFiles(
+  name: string,
+  email: string,
+  message: string,
+  keys: string[]
+) {
+  const clean = message.trim();
+  if (clean.length < 2) return { error: "Tell us a little more." };
+  if (clean.length > 5000) return { error: "That's too long (5000 max)." };
+
+  const e = email.trim();
+  if (e && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
+    return { error: "That email doesn't look right." };
+  }
+
+
+  const { error } = await supabase.from("tips").insert({
+    name: name.trim() || null,
+    email: e || null,
+    message: clean,
+    attachments: keys,
+  });
+
+  if (error) return { error: "Something went wrong sending that." };
+  return { ok: true };
+}
