@@ -1,5 +1,7 @@
 ---
 import SiteFrame from "../layouts/SiteFrame.astro";
+import VoiceRecorder from "../components/VoiceRecorder.astro";
+import "../styles/forum.css";
 ---
 <SiteFrame title="Contact / Tips — Blaine County Preparedness"
            description="Send a tip, a question, or something you think we should know.">
@@ -31,13 +33,25 @@ import SiteFrame from "../layouts/SiteFrame.astro";
                   data-tip-message></textarea>
       </label>
 
+      <VoiceRecorder />
+
+      <div class="field">
+        <span class="label">Photos or video <span class="opt">(optional)</span></span>
+        <label class="filepick">
+          <input type="file" accept="image/*,video/*" multiple data-tip-files />
+          <span class="filepick-btn">Choose files</span>
+          <span class="filepick-hint">Photos to 25MB · video to 150MB · smaller sends faster</span>
+        </label>
+        <ul class="filelist" data-file-list></ul>
+      </div>
+
       <p class="notice" data-tip-notice hidden></p>
 
       <button class="send" type="button" data-tip-send>Send</button>
 
       <p class="foot-hint">
-        Photos, video, and audio are coming soon. For now, if you have media,
-        mention it here and we'll write back with a way to send it.
+        Sending video or audio? Mention it here and we'll write back with a
+        way to get it to us.
       </p>
     </div>
 
@@ -53,7 +67,7 @@ import SiteFrame from "../layouts/SiteFrame.astro";
 </SiteFrame>
 
 <script>
-  import { sendTip } from "../lib/forum";
+  import { sendTipWithFiles, uploadFile, UPLOAD_LIMITS, kindOf, notifyTip } from "../lib/forum";
 
   const form    = document.querySelector("[data-tipform]");
   const thanks  = document.querySelector("[data-tip-thanks]");
@@ -63,13 +77,84 @@ import SiteFrame from "../layouts/SiteFrame.astro";
   const notice  = document.querySelector("[data-tip-notice]");
   const sendBtn = document.querySelector("[data-tip-send]");
   const again   = document.querySelector("[data-tip-again]");
+  const fileEl  = document.querySelector("[data-tip-files]");
+  const listEl  = document.querySelector("[data-file-list]");
+  const vmEl    = document.querySelector("[data-vm]");
+
+  let chosen = [];
+
+  const totalBytes = () => {
+    const rec = vmEl && vmEl._recording ? vmEl._recording.size : 0;
+    return chosen.reduce((n, f) => n + f.size, 0) + rec;
+  };
+
+  function drawList() {
+    if (!chosen.length) { listEl.innerHTML = ""; return; }
+    listEl.innerHTML = chosen.map((f, i) => `
+      <li class="fileitem">
+        <span class="fileitem-name">${f.name.replace(/[<>&"]/g, "")}</span>
+        <span class="fileitem-size">${(f.size / 1048576).toFixed(1)}MB</span>
+        <button type="button" class="fileitem-x" data-drop="${i}">remove</button>
+      </li>`).join("");
+    listEl.querySelectorAll("[data-drop]").forEach((b) =>
+      b.addEventListener("click", () => {
+        chosen.splice(Number(b.dataset.drop), 1);
+        drawList();
+      }));
+  }
+
+  fileEl.addEventListener("change", () => {
+    notice.hidden = true;
+    for (const f of Array.from(fileEl.files)) {
+      const kind = kindOf(f);
+      if (!kind) {
+        notice.textContent = f.name + " isn't a photo or video.";
+        notice.hidden = false; continue;
+      }
+      if (f.size > UPLOAD_LIMITS[kind]) {
+        const mb = Math.round(UPLOAD_LIMITS[kind] / 1048576);
+        notice.textContent = f.name + " is over " + mb + "MB.";
+        notice.hidden = false; continue;
+      }
+      if (totalBytes() + f.size > UPLOAD_LIMITS.totalPerTip) {
+        notice.textContent = "That's more than 250MB in one message.";
+        notice.hidden = false; break;
+      }
+      chosen.push(f);
+    }
+    fileEl.value = "";
+    drawList();
+  });
 
   sendBtn.addEventListener("click", async () => {
     sendBtn.disabled = true;
-    sendBtn.textContent = "Sending…";
     notice.hidden = true;
 
-    const res = await sendTip(nameEl.value, emailEl.value, msgEl.value);
+    // The voicemail, if there is one, uploads first.
+    const queue = [];
+    if (vmEl && vmEl._recording) queue.push(vmEl._recording);
+    queue.push(...chosen);
+
+    const keys = [];
+    for (let i = 0; i < queue.length; i++) {
+      sendBtn.textContent = queue.length === 1
+        ? "Sending..."
+        : "Sending " + (i + 1) + " of " + queue.length + "...";
+      const res = await uploadFile(queue[i]);
+      if (res.error) {
+        notice.textContent = res.error;
+        notice.hidden = false;
+        sendBtn.disabled = false;
+        sendBtn.textContent = "Send";
+        return;
+      }
+      keys.push(res.key);
+    }
+
+    sendBtn.textContent = "Sending...";
+    const res = await sendTipWithFiles(
+      nameEl.value, emailEl.value, msgEl.value, keys
+    );
 
     sendBtn.disabled = false;
     sendBtn.textContent = "Send";
@@ -80,7 +165,18 @@ import SiteFrame from "../layouts/SiteFrame.astro";
       return;
     }
 
+    // Tell Sonny a tip landed. Fire-and-forget.
+    notifyTip({
+      name: nameEl.value,
+      email: emailEl.value,
+      message: msgEl.value,
+      attachments: chosen.length,
+      hasVoicemail: !!(vmEl && vmEl._recording),
+    });
+
     nameEl.value = ""; emailEl.value = ""; msgEl.value = "";
+    chosen = []; drawList();
+    if (vmEl) vmEl._recording = null;
     form.hidden = true;
     thanks.hidden = false;
   });
@@ -93,6 +189,11 @@ import SiteFrame from "../layouts/SiteFrame.astro";
 </script>
 
 <style>
+  /* An explicit `display` beats the `hidden` attribute, so without
+     this, elements meant to be hidden stay on screen. */
+  [hidden] { display: none !important; }
+
+
   .doc { max-width: 60ch; margin: 0 auto; }
   .eyebrow {
     font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.2em;
@@ -144,6 +245,55 @@ import SiteFrame from "../layouts/SiteFrame.astro";
     font-family: var(--body); font-size: 0.88rem; line-height: 1.5;
     color: var(--sage); opacity: 0.8; margin: 0.4rem 0 0;
   }
+
+  .filepick {
+    display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
+    cursor: pointer;
+  }
+  .filepick input[type="file"] {
+    position: absolute; width: 1px; height: 1px;
+    opacity: 0; overflow: hidden;
+  }
+  .filepick-btn {
+    font-family: var(--mono); font-size: 0.7rem;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--snowmelt); background: transparent;
+    border: 1px solid var(--line); border-radius: 3px;
+    padding: 0.55rem 1rem;
+    transition: border-color 0.2s ease;
+  }
+  .filepick:hover .filepick-btn { border-color: var(--oxide); }
+  .filepick input:focus-visible + .filepick-btn { outline: 2px solid var(--oxide); }
+  .filepick-hint {
+    font-family: var(--mono); font-size: 0.62rem;
+    color: var(--sage); opacity: 0.75;
+  }
+
+  .filelist { list-style: none; margin: 0.8rem 0 0; padding: 0; }
+  .fileitem {
+    display: flex; align-items: center; gap: 0.7rem;
+    padding: 0.5rem 0.7rem;
+    background: var(--basalt-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    margin-bottom: 0.4rem;
+  }
+  .fileitem-name {
+    font-family: var(--body); font-size: 0.92rem;
+    color: var(--snowmelt);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .fileitem-size {
+    font-family: var(--mono); font-size: 0.6rem;
+    color: var(--sage); margin-left: auto; flex: none;
+  }
+  .fileitem-x {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--sage); background: transparent;
+    border: none; cursor: pointer; flex: none;
+  }
+  .fileitem-x:hover { color: #d93b1f; }
 
   .thanks { padding: 2rem 0; }
   .thanks-h {

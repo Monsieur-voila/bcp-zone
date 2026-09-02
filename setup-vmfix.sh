@@ -1,0 +1,378 @@
+#!/usr/bin/env bash
+# Voice recorder fix — run from ~/site on the uploads branch
+set -e
+if [ ! -f package.json ]; then echo "ERROR: run from ~/site"; exit 1; fi
+echo "Writing..."
+mkdir -p src/components
+
+echo "  src/components/VoiceRecorder.astro"
+cat > 'src/components/VoiceRecorder.astro' << 'VMFIX_EOF'
+---
+// ─────────────────────────────────────────────────────────────
+//  VoiceRecorder — leave a message, like a voicemail.
+//
+//  Press record, get a 3-2-1 countdown so there's no doubt when
+//  it starts, then speak. A live level meter and a visible
+//  countdown make the recording state unmistakable. Auto-stops
+//  at 5:00 and KEEPS what was captured.
+//
+//  The microphone is only opened after the button is pressed.
+//  Nothing is captured before that.
+// ─────────────────────────────────────────────────────────────
+---
+
+<div class="vm" data-vm>
+  <div class="vm-head">
+    <span class="vm-icon" aria-hidden="true">●</span>
+    <div>
+      <p class="vm-title">Leave a voicemail</p>
+      <p class="vm-sub">
+        Sometimes it's easier to just say it. Up to five minutes.
+      </p>
+    </div>
+  </div>
+
+  <!-- idle -->
+  <div class="vm-idle" data-vm-idle>
+    <button class="vm-rec" type="button" data-vm-start>Start recording</button>
+    <span class="vm-or">or</span>
+    <label class="vm-attach">
+      <input type="file" accept="audio/*" data-vm-file />
+      <span>attach an audio file</span>
+    </label>
+  </div>
+
+  <!-- counting in -->
+  <div class="vm-count" data-vm-count hidden>
+    <span class="vm-count-n" data-vm-count-n>3</span>
+    <span class="vm-count-t">get ready…</span>
+  </div>
+
+  <!-- recording -->
+  <div class="vm-live" data-vm-live hidden>
+    <div class="vm-live-top">
+      <span class="vm-dot" aria-hidden="true"></span>
+      <span class="vm-live-label">Recording</span>
+      <span class="vm-time" data-vm-time>5:00 left</span>
+    </div>
+    <div class="vm-meter" aria-hidden="true">
+      <div class="vm-meter-fill" data-vm-meter></div>
+    </div>
+    <button class="vm-stop" type="button" data-vm-stop>Stop</button>
+  </div>
+
+  <!-- done -->
+  <div class="vm-done" data-vm-done hidden>
+    <audio class="vm-play" controls data-vm-audio></audio>
+    <div class="vm-done-acts">
+      <span class="vm-kept" data-vm-kept></span>
+      <button class="vm-redo" type="button" data-vm-redo>Record again</button>
+    </div>
+  </div>
+
+  <p class="vm-err" data-vm-err hidden></p>
+</div>
+
+<script>
+  const MAX_SECONDS = 300;   // 5 minutes
+
+  const root    = document.querySelector("[data-vm]");
+  if (root) {
+    const idleEl  = root.querySelector("[data-vm-idle]");
+    const countEl = root.querySelector("[data-vm-count]");
+    const countN  = root.querySelector("[data-vm-count-n]");
+    const liveEl  = root.querySelector("[data-vm-live]");
+    const doneEl  = root.querySelector("[data-vm-done]");
+    const timeEl  = root.querySelector("[data-vm-time]");
+    const meterEl = root.querySelector("[data-vm-meter]");
+    const audioEl = root.querySelector("[data-vm-audio]");
+    const keptEl  = root.querySelector("[data-vm-kept]");
+    const errEl   = root.querySelector("[data-vm-err]");
+    const fileEl  = root.querySelector("[data-vm-file]");
+
+    let recorder = null, chunks = [], stream = null;
+    let audioCtx = null, raf = null, ticker = null;
+
+    function show(which) {
+      idleEl.hidden  = which !== "idle";
+      countEl.hidden = which !== "count";
+      liveEl.hidden  = which !== "live";
+      doneEl.hidden  = which !== "done";
+    }
+
+    function fail(msg) {
+      errEl.textContent = msg;
+      errEl.hidden = false;
+      show("idle");
+    }
+
+    function cleanup() {
+      if (raf) cancelAnimationFrame(raf);
+      if (ticker) clearInterval(ticker);
+      if (audioCtx) { audioCtx.close(); audioCtx = null; }
+      if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
+    }
+
+    // Live level meter — visible proof the mic is capturing.
+    function meter(src) {
+      try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      audioCtx.createMediaStreamSource(src).connect(analyser);
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+
+      const tick = () => {
+        analyser.getByteTimeDomainData(buf);
+        let peak = 0;
+        for (const v of buf) peak = Math.max(peak, Math.abs(v - 128));
+        const pct = Math.min(100, (peak / 128) * 180);
+        meterEl.style.width = `${pct}%`;
+        raf = requestAnimationFrame(tick);
+      };
+      tick();
+      } catch (e) {
+        // A missing level meter shouldn't stop the recording.
+        console.warn("[vm] level meter unavailable:", e);
+      }
+    }
+
+    async function begin() {
+      errEl.hidden = true;
+
+      // Mic is requested only now — never before the button.
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        fail("We couldn't reach your microphone. Check the browser's permission.");
+        return;
+      }
+
+      // 3-2-1 so the start moment is unmistakable.
+      show("count");
+      for (let n = 3; n >= 1; n--) {
+        countN.textContent = String(n);
+        await new Promise((r) => setTimeout(r, 700));
+      }
+
+      chunks = [];
+      try {
+        recorder = new MediaRecorder(stream);
+      } catch {
+        cleanup();
+        fail("This browser can't record audio. You can attach a file instead.");
+        return;
+      }
+
+      recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      recorder.onstop = () => {
+        cleanup();
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        const ext = (recorder.mimeType || "").includes("mp4") ? "m4a" : "webm";
+        root._recording = new File([blob], `voicemail.${ext}`, { type: blob.type });
+        audioEl.src = URL.createObjectURL(blob);
+        keptEl.textContent = `${(blob.size / 1048576).toFixed(1)}MB — it'll send with your message.`;
+        root.dispatchEvent(new CustomEvent("vm:ready", { bubbles: true }));
+        show("done");
+      };
+
+      try {
+        recorder.start();
+      } catch (e) {
+        cleanup();
+        fail("Recording wouldn't start: " + (e?.message || e));
+        return;
+      }
+      show("live");
+      meter(stream);
+
+      let left = MAX_SECONDS;
+      const paint = () => {
+        const m = Math.floor(left / 60), s = left % 60;
+        timeEl.textContent = `${m}:${String(s).padStart(2, "0")} left`;
+        timeEl.classList.toggle("low", left <= 30);
+      };
+      paint();
+      ticker = setInterval(() => {
+        left -= 1;
+        paint();
+        // Auto-stop at the cap, keeping what was captured.
+        if (left <= 0 && recorder.state === "recording") recorder.stop();
+      }, 1000);
+    }
+
+    root.querySelector("[data-vm-start]").addEventListener("click", () => {
+      begin().catch((e) => {
+        console.error("[vm] start failed:", e);
+        fail("Something went wrong starting the recording.");
+      });
+    });
+    root.querySelector("[data-vm-stop]").addEventListener("click", () => {
+      if (recorder?.state === "recording") recorder.stop();
+    });
+    root.querySelector("[data-vm-redo]").addEventListener("click", () => {
+      root._recording = null;
+      audioEl.removeAttribute("src");
+      root.dispatchEvent(new CustomEvent("vm:ready", { bubbles: true }));
+      show("idle");
+    });
+
+    // Attaching an audio file instead of recording.
+    fileEl.addEventListener("change", () => {
+      const f = fileEl.files?.[0];
+      if (!f) return;
+      root._recording = f;
+      audioEl.src = URL.createObjectURL(f);
+      keptEl.textContent = `${f.name} — ${(f.size / 1048576).toFixed(1)}MB`;
+      root.dispatchEvent(new CustomEvent("vm:ready", { bubbles: true }));
+      show("done");
+    });
+  }
+</script>
+
+<style>
+  /* CRITICAL: an explicit `display` value beats the `hidden`
+     attribute, so without this the recorder's states stack on top
+     of each other and nothing appears to change. */
+  [hidden] { display: none !important; }
+
+  /* The voicemail block is deliberately the warmest thing on the
+     page — this is the channel we most want people to use. */
+  .vm {
+    --vm-accent: #e0a33c;
+    border: 1px solid var(--vm-accent);
+    border-radius: 4px;
+    background:
+      linear-gradient(180deg, rgba(224,163,60,0.07) 0%, rgba(224,163,60,0.02) 100%);
+    padding: 1.4rem 1.5rem;
+  }
+
+  .vm-head { display: flex; align-items: flex-start; gap: 0.8rem; margin-bottom: 1.1rem; }
+  .vm-icon { color: var(--vm-accent); font-size: 0.9rem; line-height: 1.4; }
+  .vm-title {
+    font-family: var(--display); font-size: 1.35rem;
+    color: var(--snowmelt); margin: 0 0 0.2rem;
+  }
+  .vm-sub {
+    font-family: var(--body); font-size: 0.95rem;
+    color: var(--sage); margin: 0;
+  }
+
+  .vm-idle { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+  .vm-rec {
+    font-family: var(--mono); font-size: 0.74rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--basalt); background: var(--vm-accent);
+    border: 1px solid var(--vm-accent); border-radius: 3px;
+    padding: 0.7rem 1.3rem; cursor: pointer;
+    transition: background 0.2s ease;
+  }
+  .vm-rec:hover { background: #f0b855; }
+  .vm-or { font-family: var(--body); font-size: 0.9rem; color: var(--sage); }
+  .vm-attach { cursor: pointer; }
+  .vm-attach input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .vm-attach span {
+    font-family: var(--body); font-size: 0.92rem;
+    color: var(--vm-accent);
+    border-bottom: 1px solid rgba(224,163,60,0.4);
+  }
+  .vm-attach:hover span { color: #f0b855; }
+
+  /* counting in */
+  .vm-count { display: flex; align-items: center; gap: 0.9rem; }
+  .vm-count-n {
+    font-family: var(--display); font-size: 2.6rem;
+    color: var(--vm-accent); line-height: 1;
+  }
+  .vm-count-t {
+    font-family: var(--mono); font-size: 0.7rem;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--sage);
+  }
+
+  /* recording */
+  .vm-live-top { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem; }
+  .vm-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #d93b1f; flex: none;
+    animation: vmpulse 1.2s ease-in-out infinite;
+  }
+  @keyframes vmpulse {
+    0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(217,59,31,0.5); }
+    50%     { opacity: 0.7; box-shadow: 0 0 0 7px rgba(217,59,31,0); }
+  }
+  .vm-live-label {
+    font-family: var(--mono); font-size: 0.72rem;
+    letter-spacing: 0.14em; text-transform: uppercase; color: #d93b1f;
+  }
+  .vm-time {
+    margin-left: auto; font-family: var(--mono);
+    font-size: 0.7rem; color: var(--sage);
+  }
+  .vm-time.low { color: #d93b1f; }
+
+  .vm-meter {
+    height: 6px; background: rgba(255,255,255,0.07);
+    border-radius: 3px; overflow: hidden; margin-bottom: 0.9rem;
+  }
+  .vm-meter-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--vm-accent), #d93b1f);
+    transition: width 0.06s linear;
+  }
+
+  .vm-stop {
+    font-family: var(--mono); font-size: 0.7rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--snowmelt); background: transparent;
+    border: 1px solid var(--line); border-radius: 3px;
+    padding: 0.5rem 1.1rem; cursor: pointer;
+  }
+  .vm-stop:hover { border-color: #d93b1f; color: #d93b1f; }
+
+  /* done */
+  .vm-play { width: 100%; margin-bottom: 0.7rem; }
+  .vm-done-acts { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+  .vm-kept { font-family: var(--mono); font-size: 0.64rem; color: var(--sage); }
+  .vm-redo {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--sage); background: transparent;
+    border: none; cursor: pointer; margin-left: auto;
+  }
+  .vm-redo:hover { color: var(--vm-accent); }
+
+  .vm-err {
+    font-family: var(--mono); font-size: 0.7rem;
+    color: #d93b1f; margin: 0.9rem 0 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vm-dot { animation: none; }
+  }
+</style>
+VMFIX_EOF
+
+echo "  package.json"
+cat > 'package.json' << 'VMFIX_EOF'
+{
+  "name": "bcp-zone",
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "dev:full": "astro build && wrangler pages dev dist --r2 TIPS_BUCKET --compatibility-date=2026-08-08"
+  },
+  "dependencies": {
+    "astro": "^4.16.0",
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}
+VMFIX_EOF
+
+echo ""
+echo "Then: git add -A && git commit -m \"voice recorder fix\" && git push"

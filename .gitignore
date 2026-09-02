@@ -13,3 +13,10 @@ package-lock.json
 files/
 authpdf/
 *.pdf
+.wrangler/
+dist/
+
+# database dumps — never commit
+backup-*.sql
+*.dump
+redaction/

@@ -62,7 +62,7 @@ import "../styles/forum.css";
           <span class="tip-when">${ago(t.created_at)}</span>
         </div>
         ${t.email
-          ? `<button type="button" class="tip-email" data-copy="${esc(t.email)}" title="Click to copy">${esc(t.email)}</button>`
+          ? `<a class="tip-email" href="mailto:${esc(t.email)}">${esc(t.email)}</a>`
           : `<span class="tip-noemail">no reply address</span>`}
         <div class="tip-body">${esc(t.message)}</div>
         ${(t.attachments && t.attachments.length)
@@ -119,17 +119,6 @@ import "../styles/forum.css";
         });
       }
     }
-
-    // Click an email to copy it — no mail client involved.
-    list.querySelectorAll("[data-copy]").forEach((b) =>
-      b.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(b.dataset.copy);
-          const original = b.textContent;
-          b.textContent = "copied";
-          setTimeout(() => { b.textContent = original; }, 1200);
-        } catch {}
-      }));
 
     list.querySelectorAll("[data-read]").forEach((b) =>
       b.addEventListener("click", async () => {
@@ -195,139 +184,4 @@ import "../styles/forum.css";
     color: var(--sage); margin: 0 0 1.2rem;
   }
   .locked { display: flex; flex-direction: column; gap: 0.8rem; align-items: flex-start; }
-</style>
-
-<style is:global>
-  /* ═══════════════════════════════════════════════════════════
-     TIPS INBOX STYLES — in-page and is:global ON PURPOSE.
-     The cards are injected by JavaScript; scoped styles can't
-     reach them, and external-file imports proved unreliable.
-     This block ships with the page itself.
-     ═══════════════════════════════════════════════════════════ */
-
-  .count {
-    font-family: var(--mono);
-    font-size: 0.66rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--sage);
-    margin: 0 0 1.4rem;
-  }
-
-  .empty {
-    font-family: var(--mono);
-    font-size: 0.72rem;
-    color: var(--sage);
-    opacity: 0.8;
-  }
-
-  .tip {
-    background: var(--basalt-2);
-    border: 1px solid var(--line);
-    border-left: 2px solid var(--line);
-    border-radius: 3px;
-    padding: 1.3rem 1.4rem;
-    margin-bottom: 1rem;
-  }
-  .tip.unread { border-left-color: var(--oxide); }
-
-  .tip-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.3rem;
-  }
-  .tip-who {
-    font-family: var(--body);
-    font-size: 1.05rem;
-    color: var(--snowmelt);
-  }
-  .tip-when {
-    font-family: var(--mono);
-    font-size: 0.6rem;
-    letter-spacing: 0.08em;
-    color: var(--sage);
-    flex: none;
-  }
-
-  .tip-email {
-    font-family: var(--mono);
-    font-size: 0.68rem;
-    color: #e0c85a;
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid rgba(224, 200, 90, 0.35);
-    padding: 0 0 1px;
-    cursor: copy;
-  }
-  .tip-email:hover { color: #f5e08a; border-bottom-color: #f5e08a; }
-  .tip-noemail {
-    font-family: var(--mono);
-    font-size: 0.62rem;
-    color: var(--sage);
-    opacity: 0.6;
-  }
-
-  .tip-body {
-    font-family: var(--body);
-    font-size: 1.05rem;
-    line-height: 1.6;
-    color: var(--snowmelt);
-    white-space: pre-wrap;
-    margin: 0.9rem 0 0;
-  }
-
-  .tip-acts { display: flex; gap: 0.5rem; margin-top: 1rem; }
-  .tip-btn {
-    font-family: var(--mono);
-    font-size: 0.58rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--sage);
-    background: transparent;
-    border: 1px solid var(--line);
-    border-radius: 2px;
-    padding: 0.3rem 0.65rem;
-    cursor: pointer;
-    opacity: 0.6;
-    transition: opacity 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-  }
-  .tip:hover .tip-btn { opacity: 1; }
-  .tip-btn:hover { color: var(--snowmelt); border-color: var(--sage); }
-
-  /* attachments */
-  .tip-shots { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
-  .tip-shot {
-    width: 140px; height: 140px; object-fit: cover;
-    border: 1px solid var(--line); border-radius: 3px;
-    background: var(--basalt); cursor: zoom-in;
-  }
-  .tip-shot:hover { border-color: var(--oxide); }
-  .tip-shot-fail {
-    font-family: var(--mono); font-size: 0.6rem;
-    color: var(--sage); opacity: 0.6;
-  }
-  .tip-voice {
-    display: flex; flex-direction: column; gap: 0.4rem;
-    width: 100%;
-    padding: 0.8rem 0.9rem;
-    background: rgba(224, 163, 60, 0.06);
-    border: 1px solid rgba(224, 163, 60, 0.5);
-    border-radius: 3px;
-    margin-bottom: 0.6rem;
-  }
-  .tip-voice-tag {
-    font-family: var(--mono); font-size: 0.56rem;
-    letter-spacing: 0.14em; text-transform: uppercase;
-    color: #e0a33c;
-  }
-  .tip-audio { width: 100%; }
-  .tip-media { display: inline-block; }
-  .tip-video {
-    max-width: 320px;
-    border: 1px solid var(--line);
-    border-radius: 3px;
-    background: #000;
-  }
 </style>

@@ -155,6 +155,11 @@ const { mode = "section", sectionId = "" } = Astro.props;
 </script>
 
 <style>
+  /* An explicit `display` beats the `hidden` attribute, so without
+     this, elements meant to be hidden stay on screen. */
+  [hidden] { display: none !important; }
+
+
   .composer { margin: 0 0 2rem; }
 
   .signed-out {

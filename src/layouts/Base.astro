@@ -1,4 +1,6 @@
 ---
+import "../styles/global-forum.css";
+
 import { site } from "../site.config";
 interface Props {
   title?: string;
@@ -6,7 +8,9 @@ interface Props {
 }
 const {
   title = `${site.name} — a signal in the valley`,
-  description = site.description,
+    description = site.description,
+
+  
 } = Astro.props;
 ---
 
@@ -35,9 +39,7 @@ const {
 <style is:global>
   @font-face {
     font-family: "Redaction 35";
-    src:
-      url("/fonts/Redaction35-Regular.woff2") format("woff2"),
-      url("/fonts/Redaction35-Regular.woff") format("woff");
+    src: url("/fonts/Redaction35-Regular.woff2") format("woff2");
     font-weight: 400;
     font-display: swap;
   }
@@ -51,7 +53,7 @@ const {
     --oxide:    #c05a2e;
     --line:     rgba(232, 236, 239, 0.14);
 
-    --display: "Redaction 35", "Newsreader", Georgia, serif;
+    --display: "Newsreader", Georgia, serif;
     --body:    "Newsreader", Georgia, serif;
     --mono:    "Martian Mono", ui-monospace, "SFMono-Regular", monospace;
 

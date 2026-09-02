@@ -1,3 +1,208 @@
+#!/usr/bin/env bash
+# Global forum stylesheet — run from ~/site
+set -e
+if [ ! -f package.json ]; then echo "ERROR: run from ~/site"; exit 1; fi
+mkdir -p src/styles
+
+echo "  src/styles/global-forum.css"
+cat > 'src/styles/global-forum.css' << 'GLOBALCSS_EOF'
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL FORUM + HEAT STYLES
+
+   Loaded once from Base.astro so it applies on every page.
+
+   WHY GLOBAL: the section cards, thread cards, and tip cards are
+   injected by JavaScript at runtime. Astro's scoped <style> blocks
+   never reach runtime-injected markup, and per-page imports proved
+   unreliable for the same reason. Loading this globally is what
+   actually works.
+
+   This file is the combination of heat.css + forum.css. Edit HERE;
+   the originals are kept for reference but are no longer the
+   source of truth.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════
+   HEAT — "what's hot" indicator for The Table.
+
+   Three bands of behaviour:
+     LOW   a dot flashes in place on the bottom edge. No travel.
+     MED   a segment traverses the bottom edge. Faster as heat rises.
+     HIGH  travels half the box, then HOLDS. No flashing. Calm,
+           but the colour itself carries the urgency.
+
+   The border colour shifts smoothly yellow -> red with heat.
+
+   ─── KNOBS ────────────────────────────────────────────────────
+   Everything you'd want to tune is in the :root block below.
+   Change, save, refresh. Experimental by design.
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Colour stops: rest (yellow) through to hot (red) ── */
+  --heat-c0: #d9c04a;   /* baseline / quiet — yellow */
+  --heat-c1: #d9a441;   /* stirring — amber */
+  --heat-c2: #c9803e;   /* warm — amber-rust */
+  --heat-c3: #c05a2e;   /* live — oxide */
+  --heat-c4: #d93b1f;   /* hot — red */
+
+  /* ── Band thresholds (heat is 0–100) ──
+     Below LOW-max: dot flashes in place.
+     Between: segment traverses the bottom edge.
+     Above HIGH-min: travels half, then holds. */
+  --heat-band-low:  25;   /* documentation only; logic lives in forum.ts */
+  --heat-band-high: 70;
+
+  /* ── Motion ──
+     travel-dur  = how long one sweep takes (fast flick)
+     gap-*       = rest between sweeps; smaller = more often */
+  --heat-travel-dur: 0.125s;
+  --heat-gap-slow:   3.2s;    /* low activity */
+  --heat-gap-med:    1.6s;    /* medium */
+  --heat-gap-fast:   0.9s;    /* upper medium */
+
+  /* ── Geometry ── */
+  --heat-rail-h:     2px;     /* thickness of the bottom rail */
+  --heat-dot-w:      10%;     /* width of the "flash in place" dot */
+  --heat-seg-w:      22%;     /* width of the travelling segment */
+  --heat-hold-w:     50%;     /* HIGH: how far it travels and holds */
+}
+
+/* ── The card ────────────────────────────────────────────────
+   Put data-heat="quiet|warm|live|hot" on the card element.
+   Border colour follows the band. */
+
+.heat-card {
+  position: relative;
+  overflow: hidden;                 /* keeps the rail inside the corners */
+  border: 1px solid var(--heat-border, var(--heat-c0));
+  border-radius: 3px;
+  transition: border-color 0.6s ease;
+}
+
+[data-heat="quiet"] { --heat-border: var(--heat-c0); --heat-rgb: 217, 192, 74; }
+[data-heat="warm"]  { --heat-border: var(--heat-c2); --heat-rgb: 201, 128, 62; }
+[data-heat="live"]  { --heat-border: var(--heat-c3); --heat-rgb: 192,  90, 46; }
+[data-heat="hot"]   { --heat-border: var(--heat-c4); --heat-rgb: 217,  59, 31; }
+
+/* ── The rail: a track along the bottom edge of the card ───── */
+.heat-rail {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: var(--heat-rail-h);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* The moving light itself. */
+.heat-rail::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 0;
+  width: var(--heat-dot-w);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(var(--heat-rgb)) 50%,
+    transparent 100%
+  );
+  filter: drop-shadow(0 0 4px rgba(var(--heat-rgb), 0.75));
+  opacity: 0;
+}
+
+/* QUIET — nothing. Just the yellow border. */
+[data-heat="quiet"] .heat-rail::after { opacity: 0; animation: none; }
+
+/* LOW / WARM — a dot flashing in place, no travel. */
+[data-heat="warm"] .heat-rail::after {
+  width: var(--heat-dot-w);
+  left: 50%;
+  transform: translateX(-50%);
+  animation: heat-blink var(--heat-gap-slow) steps(1, end) infinite;
+}
+
+/* MEDIUM / LIVE — a segment traverses the bottom edge. */
+[data-heat="live"] .heat-rail::after {
+  width: var(--heat-seg-w);
+  animation: heat-travel var(--heat-gap-med) linear infinite;
+}
+
+/* HIGH / HOT — travels half the box, then HOLDS. No flashing.
+   Steady presence: the colour carries the urgency. */
+[data-heat="hot"] .heat-rail::after {
+  width: var(--heat-hold-w);
+  left: 0;
+  opacity: 1;
+  animation: heat-settle 1.4s ease-out 1 forwards;
+  background: linear-gradient(
+    90deg,
+    rgb(var(--heat-rgb)) 0%,
+    rgba(var(--heat-rgb), 0.55) 70%,
+    transparent 100%
+  );
+}
+
+/* ── Keyframes ─────────────────────────────────────────────── */
+
+/* flash in place: brief on, long off */
+@keyframes heat-blink {
+  0%   { opacity: 0; }
+  2%   { opacity: 1; }
+  6%   { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* fast sweep across, then rest.
+   The visible travel occupies only the first slice of the cycle,
+   so --heat-gap-* controls how OFTEN, not how fast. */
+@keyframes heat-travel {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  1%   { opacity: 1; }
+  8%   { transform: translateX(calc(100vw)); opacity: 1; }
+  9%   { opacity: 0; }
+  100% { transform: translateX(calc(100vw)); opacity: 0; }
+}
+
+/* settle in and hold */
+@keyframes heat-settle {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  60%  { opacity: 1; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+/* ── The dot (used in headings and the rail card) ──────────── */
+.heat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--heat-border, var(--heat-c0));
+  opacity: 0.55;
+  transition: background 0.6s ease, opacity 0.6s ease;
+}
+[data-heat="warm"] .heat-dot,
+.heat-dot[data-heat="warm"] { opacity: 0.9; }
+[data-heat="live"] .heat-dot,
+.heat-dot[data-heat="live"] { opacity: 1; }
+[data-heat="hot"]  .heat-dot,
+.heat-dot[data-heat="hot"]  { opacity: 1; }
+
+/* ── OFF SWITCH ────────────────────────────────────────────────
+   All motion stops for anyone who asks for reduced motion.
+   Colour still communicates heat; nothing moves. */
+@media (prefers-reduced-motion: reduce) {
+  .heat-rail::after {
+    animation: none !important;
+    opacity: 0.9 !important;
+    transform: none !important;
+    left: 0 !important;
+    width: var(--heat-hold-w) !important;
+  }
+  [data-heat="quiet"] .heat-rail::after { opacity: 0 !important; }
+  .heat-dot { animation: none !important; }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    FORUM LAYOUT — sections, threads, rails.
 
@@ -449,3 +654,10 @@
   border-radius: 3px;
   background: #000;
 }
+GLOBALCSS_EOF
+
+echo ""
+echo "NOW ADD ONE LINE to src/layouts/Base.astro frontmatter:"
+echo "    import \"../styles/global-forum.css\";"
+echo ""
+echo "It goes between the --- fences at the top of the file."
