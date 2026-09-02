@@ -1,6 +1,8 @@
 ---
 import SiteFrame from "../layouts/SiteFrame.astro";
 import AuthButton from "../components/AuthButton.astro";
+import "../styles/heat.css";
+import "../styles/forum.css";
 ---
 <SiteFrame title="Tips — Blaine County Preparedness">
   <div class="inbox">
@@ -22,7 +24,7 @@ import AuthButton from "../components/AuthButton.astro";
 
 <script>
   import { supabase } from "../lib/supabase";
-  import { myProfile, getTips, markTipRead, archiveTip, ago } from "../lib/forum";
+  import { myProfile, getTips, markTipRead, archiveTip, ago, attachmentUrl } from "../lib/forum";
 
   const esc = (s) =>
     String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -60,9 +62,12 @@ import AuthButton from "../components/AuthButton.astro";
           <span class="tip-when">${ago(t.created_at)}</span>
         </div>
         ${t.email
-          ? `<a class="tip-email" href="mailto:${esc(t.email)}">${esc(t.email)}</a>`
+          ? `<button type="button" class="tip-email" data-copy="${esc(t.email)}" title="Click to copy">${esc(t.email)}</button>`
           : `<span class="tip-noemail">no reply address</span>`}
         <div class="tip-body">${esc(t.message)}</div>
+        ${(t.attachments && t.attachments.length)
+          ? `<div class="tip-shots" data-shots='${JSON.stringify(t.attachments)}'></div>`
+          : ""}
         <div class="tip-acts">
           <button class="tip-btn" data-read="${t.id}" data-state="${t.is_read}">
             ${t.is_read ? "Mark unread" : "Mark read"}
@@ -70,6 +75,61 @@ import AuthButton from "../components/AuthButton.astro";
           <button class="tip-btn" data-archive="${t.id}">Archive</button>
         </div>
       </article>`).join("");
+
+    // Load attachments. Each request re-verifies admin server-side.
+    for (const box of list.querySelectorAll("[data-shots]")) {
+      let keys = [];
+      try { keys = JSON.parse(box.dataset.shots); } catch {}
+      for (const key of keys) {
+        // Pick the player from the stored extension.
+        const ext = String(key).split(".").pop().toLowerCase();
+        const isAudio = ["m4a","mp3","wav","ogg","flac"].includes(ext);
+        const isVideo = ["mp4","mov","webm"].includes(ext);
+
+        const holder = document.createElement("div");
+        holder.className = isAudio ? "tip-voice" : "tip-media";
+        if (isAudio) {
+          holder.innerHTML = `<span class="tip-voice-tag">voicemail</span>`;
+        }
+        box.appendChild(holder);
+
+        attachmentUrl(key).then((url) => {
+          if (!url) {
+            holder.innerHTML = `<span class="tip-shot-fail">unavailable</span>`;
+            return;
+          }
+          let el;
+          if (isAudio) {
+            el = document.createElement("audio");
+            el.controls = true;
+            el.className = "tip-audio";
+          } else if (isVideo) {
+            el = document.createElement("video");
+            el.controls = true;
+            el.className = "tip-video";
+            el.preload = "metadata";
+          } else {
+            el = document.createElement("img");
+            el.className = "tip-shot";
+            el.alt = "attachment";
+            el.loading = "lazy";
+          }
+          el.src = url;
+          holder.appendChild(el);
+        });
+      }
+    }
+
+    // Click an email to copy it — no mail client involved.
+    list.querySelectorAll("[data-copy]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(b.dataset.copy);
+          const original = b.textContent;
+          b.textContent = "copied";
+          setTimeout(() => { b.textContent = original; }, 1200);
+        } catch {}
+      }));
 
     list.querySelectorAll("[data-read]").forEach((b) =>
       b.addEventListener("click", async () => {
@@ -116,6 +176,10 @@ import AuthButton from "../components/AuthButton.astro";
 </script>
 
 <style>
+  /* An explicit `display` beats the `hidden` attribute, so without
+     this the loading, locked, and list states stack on screen. */
+  [hidden] { display: none !important; }
+
   .inbox { max-width: 68ch; margin: 0 auto; }
   .eyebrow {
     font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.2em;
@@ -131,4 +195,139 @@ import AuthButton from "../components/AuthButton.astro";
     color: var(--sage); margin: 0 0 1.2rem;
   }
   .locked { display: flex; flex-direction: column; gap: 0.8rem; align-items: flex-start; }
+</style>
+
+<style is:global>
+  /* ═══════════════════════════════════════════════════════════
+     TIPS INBOX STYLES — in-page and is:global ON PURPOSE.
+     The cards are injected by JavaScript; scoped styles can't
+     reach them, and external-file imports proved unreliable.
+     This block ships with the page itself.
+     ═══════════════════════════════════════════════════════════ */
+
+  .count {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin: 0 0 1.4rem;
+  }
+
+  .empty {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--sage);
+    opacity: 0.8;
+  }
+
+  .tip {
+    background: var(--basalt-2);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--line);
+    border-radius: 3px;
+    padding: 1.3rem 1.4rem;
+    margin-bottom: 1rem;
+  }
+  .tip.unread { border-left-color: var(--oxide); }
+
+  .tip-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.3rem;
+  }
+  .tip-who {
+    font-family: var(--body);
+    font-size: 1.05rem;
+    color: var(--snowmelt);
+  }
+  .tip-when {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    color: var(--sage);
+    flex: none;
+  }
+
+  .tip-email {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: #e0c85a;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(224, 200, 90, 0.35);
+    padding: 0 0 1px;
+    cursor: copy;
+  }
+  .tip-email:hover { color: #f5e08a; border-bottom-color: #f5e08a; }
+  .tip-noemail {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--sage);
+    opacity: 0.6;
+  }
+
+  .tip-body {
+    font-family: var(--body);
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: var(--snowmelt);
+    white-space: pre-wrap;
+    margin: 0.9rem 0 0;
+  }
+
+  .tip-acts { display: flex; gap: 0.5rem; margin-top: 1rem; }
+  .tip-btn {
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sage);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 0.3rem 0.65rem;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+  .tip:hover .tip-btn { opacity: 1; }
+  .tip-btn:hover { color: var(--snowmelt); border-color: var(--sage); }
+
+  /* attachments */
+  .tip-shots { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+  .tip-shot {
+    width: 140px; height: 140px; object-fit: cover;
+    border: 1px solid var(--line); border-radius: 3px;
+    background: var(--basalt); cursor: zoom-in;
+  }
+  .tip-shot:hover { border-color: var(--oxide); }
+  .tip-shot-fail {
+    font-family: var(--mono); font-size: 0.6rem;
+    color: var(--sage); opacity: 0.6;
+  }
+  .tip-voice {
+    display: flex; flex-direction: column; gap: 0.4rem;
+    width: 100%;
+    padding: 0.8rem 0.9rem;
+    background: rgba(224, 163, 60, 0.06);
+    border: 1px solid rgba(224, 163, 60, 0.5);
+    border-radius: 3px;
+    margin-bottom: 0.6rem;
+  }
+  .tip-voice-tag {
+    font-family: var(--mono); font-size: 0.56rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: #e0a33c;
+  }
+  .tip-audio { width: 100%; }
+  .tip-media { display: inline-block; }
+  .tip-video {
+    max-width: 320px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #000;
+  }
 </style>
