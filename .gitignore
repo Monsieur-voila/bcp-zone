@@ -19,3 +19,4 @@ dist/
 # database dumps — never commit
 backup-*.sql
 *.dump
+redaction/
