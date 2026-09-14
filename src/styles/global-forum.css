@@ -216,20 +216,9 @@
   }
   [data-heat="quiet"] .heat-rail::after { opacity: 0 !important; }
   .heat-dot { animation: none !important; }
-  @media (prefers-reduced-motion: reduce) {
-  .heat-rail::after {
-    animation: none !important;
-    opacity: 0.9 !important;
-    transform: none !important;
-    left: 0 !important;
-    width: var(--heat-hold-w) !important;
-  }
-  [data-heat="quiet"] .heat-rail::after { opacity: 0 !important; }
-  .heat-dot { animation: none !important; }
   [data-heat="warm"],
   [data-heat="live"],
   [data-heat="hot"] { animation: none !important; }
-
 }
 
 /* ═══════════════════════════════════════════════════════════════
