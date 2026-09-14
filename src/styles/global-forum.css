@@ -37,6 +37,12 @@
   --heat-c2: #c9803e;   /* warm — amber-rust */
   --heat-c3: #c05a2e;   /* live — oxide */
   --heat-c4: #d93b1f;   /* hot — red */
+  --heat-scale-warm: 1.004;
+  --heat-scale-live: 1.010;
+  --heat-scale-hot:  1.018;
+  --heat-pulse-dur-warm: 4.5s;
+  --heat-pulse-dur-live: 2.6s;
+  --heat-pulse-dur-hot:  1.6s;
 
   /* ── Band thresholds (heat is 0–100) ──
      Below LOW-max: dot flashes in place.
@@ -76,6 +82,23 @@
 [data-heat="warm"]  { --heat-border: var(--heat-c2); --heat-rgb: 201, 128, 62; }
 [data-heat="live"]  { --heat-border: var(--heat-c3); --heat-rgb: 192,  90, 46; }
 [data-heat="hot"]   { --heat-border: var(--heat-c4); --heat-rgb: 217,  59, 31; }
+[data-heat="warm"] {
+  animation: heat-pulse var(--heat-pulse-dur-warm) ease-in-out infinite;
+  --heat-pulse-scale: var(--heat-scale-warm);
+}
+[data-heat="live"] {
+  animation: heat-pulse var(--heat-pulse-dur-live) ease-in-out infinite;
+  --heat-pulse-scale: var(--heat-scale-live);
+}
+[data-heat="hot"] {
+  animation: heat-pulse var(--heat-pulse-dur-hot) ease-in-out infinite;
+  --heat-pulse-scale: var(--heat-scale-hot);
+}
+
+@keyframes heat-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(var(--heat-pulse-scale)); }
+}
 
 /* ── The rail: a track along the bottom edge of the card ───── */
 .heat-rail {
@@ -193,6 +216,20 @@
   }
   [data-heat="quiet"] .heat-rail::after { opacity: 0 !important; }
   .heat-dot { animation: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+  .heat-rail::after {
+    animation: none !important;
+    opacity: 0.9 !important;
+    transform: none !important;
+    left: 0 !important;
+    width: var(--heat-hold-w) !important;
+  }
+  [data-heat="quiet"] .heat-rail::after { opacity: 0 !important; }
+  .heat-dot { animation: none !important; }
+  [data-heat="warm"],
+  [data-heat="live"],
+  [data-heat="hot"] { animation: none !important; }
+
 }
 
 /* ═══════════════════════════════════════════════════════════════

@@ -1,6 +1,7 @@
 ---
 // ─────────────────────────────────────────────────────────────
-//  AuthButton — Sign in with Google / signed-in state / sign out.
+//  AuthButton — Sign in with Google, sign in with magic link,
+//  signed-in state, sign out.
 //
 //  COLOR KNOBS live at the top of the style block below.
 //  Change those variables to restyle the whole component.
@@ -9,10 +10,35 @@
 
 <div class="auth" data-auth-root>
   <!-- signed-out view -->
-  <button class="auth-btn" type="button" data-auth-signin hidden>
-    <span class="g" aria-hidden="true">G</span>
-    Sign in with Google
-  </button>
+  <div class="auth-out-wrap" data-auth-signed-out hidden>
+    <button class="auth-btn" type="button" data-auth-signin>
+      <span class="g" aria-hidden="true">G</span>
+      Sign in with Google
+    </button>
+
+    <div class="auth-divider" aria-hidden="true"><span>or</span></div>
+
+    <form class="magic-form" data-auth-magic-form>
+      <input
+        class="magic-input"
+        type="email"
+        name="email"
+        placeholder="you@example.com"
+        autocomplete="email"
+        required
+        data-auth-magic-email
+      />
+      <button class="magic-btn" type="submit" data-auth-magic-submit>
+        <span class="lock" aria-hidden="true">🔒</span>
+        Send magic link
+      </button>
+    </form>
+
+    <p class="magic-sent" data-auth-magic-sent hidden>
+      Check your email for a sign-in link.
+    </p>
+    <p class="magic-error" data-auth-magic-error hidden></p>
+  </div>
 
   <!-- terms notice, shown only when signed out -->
   <p class="terms-note" data-auth-terms hidden>
@@ -36,13 +62,19 @@
 <script>
   import { supabase } from "../lib/supabase";
 
-  const root     = document.querySelector("[data-auth-root]");
-  const signInEl = root.querySelector("[data-auth-signin]");
-  const userEl   = root.querySelector("[data-auth-user]");
-  const nameEl   = root.querySelector("[data-auth-name]");
-  const outEl    = root.querySelector("[data-auth-signout]");
-  const waitEl   = root.querySelector("[data-auth-loading]");
-  const termsEl  = root.querySelector("[data-auth-terms]");
+  const root       = document.querySelector("[data-auth-root]");
+  const outWrapEl  = root.querySelector("[data-auth-signed-out]");
+  const signInEl   = root.querySelector("[data-auth-signin]");
+  const userEl     = root.querySelector("[data-auth-user]");
+  const nameEl     = root.querySelector("[data-auth-name]");
+  const outEl      = root.querySelector("[data-auth-signout]");
+  const waitEl     = root.querySelector("[data-auth-loading]");
+  const termsEl    = root.querySelector("[data-auth-terms]");
+  const magicForm  = root.querySelector("[data-auth-magic-form]");
+  const magicEmail = root.querySelector("[data-auth-magic-email]");
+  const magicBtn   = root.querySelector("[data-auth-magic-submit]");
+  const magicSent  = root.querySelector("[data-auth-magic-sent]");
+  const magicError = root.querySelector("[data-auth-magic-error]");
 
   function render(session) {
     waitEl.hidden = true;
@@ -51,11 +83,11 @@
       nameEl.textContent =
         u.user_metadata?.full_name || u.user_metadata?.name || u.email || "friend";
       userEl.hidden = false;
-      signInEl.hidden = true;
+      outWrapEl.hidden = true;
       if (termsEl) termsEl.hidden = true;
     } else {
       userEl.hidden = true;
-      signInEl.hidden = false;
+      outWrapEl.hidden = false;
       if (termsEl) termsEl.hidden = false;
     }
   }
@@ -73,47 +105,81 @@
     if (error) console.error("[auth] sign-in failed:", error.message);
   });
 
+  magicForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    magicError.hidden = true;
+    magicSent.hidden = true;
+
+    const email = magicEmail.value.trim();
+    if (!email) return;
+
+    magicBtn.disabled = true;
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname },
+    });
+    magicBtn.disabled = false;
+
+    if (error) {
+      magicError.textContent = "Couldn't send that link — try again in a moment.";
+      magicError.hidden = false;
+      console.error("[auth] magic link failed:", error.message);
+      return;
+    }
+    magicForm.hidden = true;
+    magicSent.hidden = false;
+  });
+
   outEl.addEventListener("click", async () => {
     const { error } = await supabase.auth.signOut();
     if (error) console.error("[auth] sign-out failed:", error.message);
-    // Don't wait on the auth event — update immediately.
     render(null);
   });
 </script>
 
 <style>
-  /* ═══ COLOR KNOBS — change these to restyle ═══════════════
-     Each is a normal CSS color. Swap in any hex you like. */
+  /* ═══ COLOR KNOBS — change these to restyle ═══════════════ */
   .auth {
-    --auth-name-color:    #7aa7d9;   /* "Field Array" — the blue */
+    --auth-name-color:    #7aa7d9;
     --auth-label-color:   var(--sage);
-    --auth-signout-color: #d9a441;   /* SIGN OUT — warm amber */
+    --auth-signout-color: #d9a441;
     --auth-signout-hover: #f0c368;
-    --auth-google-g:      #4285F4;   /* the G — Google blue */
+    --auth-google-g:      #4285F4;
     --auth-btn-text:      var(--snowmelt);
     --auth-btn-border:    var(--line);
     --auth-btn-hover:     var(--oxide);
+
+    --auth-magic-color:   #2f9e8f;
+    --auth-magic-hover:   #3fc0af;
+    --auth-magic-text:    var(--basalt);
   }
   /* ═════════════════════════════════════════════════════════ */
 
-  /* CRITICAL: makes the `hidden` attribute actually win over
-     display:flex etc. Without this the views stack on screen. */
   [hidden] { display: none !important; }
 
   .auth {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
     gap: 0.7rem;
     font-family: var(--mono);
     font-size: 0.7rem;
     letter-spacing: 0.08em;
   }
 
+  .auth-out-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    max-width: 280px;
+  }
+
   .auth-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.55rem;
     font-family: var(--mono);
     font-size: 0.7rem;
@@ -125,6 +191,7 @@
     border-radius: 3px;
     padding: 0.5rem 0.9rem;
     cursor: pointer;
+    width: 100%;
     transition: border-color 0.2s ease, background 0.2s ease;
   }
   .auth-btn:hover {
@@ -138,6 +205,88 @@
     font-weight: 700;
     color: var(--auth-google-g);
     line-height: 1;
+  }
+
+  .auth-divider {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    color: var(--sage);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.6;
+  }
+  .auth-divider::before,
+  .auth-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+  .auth-divider span { padding: 0 0.6rem; }
+
+  .magic-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .magic-input {
+    font-family: var(--body);
+    font-size: 0.85rem;
+    color: var(--snowmelt);
+    background: var(--basalt-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0.5rem 0.7rem;
+    width: 100%;
+  }
+  .magic-input:focus {
+    outline: none;
+    border-color: var(--auth-magic-color);
+  }
+
+  .magic-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--auth-magic-text);
+    background: var(--auth-magic-color);
+    border: 1px solid var(--auth-magic-color);
+    border-radius: 3px;
+    padding: 0.55rem 0.9rem;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  }
+  .magic-btn:hover {
+    background: var(--auth-magic-hover);
+    border-color: var(--auth-magic-hover);
+    transform: translateY(-1px);
+  }
+  .magic-btn:disabled { opacity: 0.6; cursor: default; transform: none; }
+  .lock { font-size: 0.8rem; line-height: 1; }
+
+  .magic-sent {
+    font-family: var(--body);
+    font-size: 0.8rem;
+    color: var(--auth-magic-color);
+    text-align: center;
+    margin: 0;
+  }
+  .magic-error {
+    font-family: var(--body);
+    font-size: 0.78rem;
+    color: var(--heat-c4, #d93b1f);
+    text-align: center;
+    margin: 0;
   }
 
   .auth-in { display: flex; align-items: center; gap: 1rem; }
@@ -154,7 +303,6 @@
     letter-spacing: 0.04em;
   }
 
-  /* SIGN OUT — more prominent: bordered, warm, its own presence */
   .auth-out {
     font-family: var(--mono);
     font-size: 0.66rem;
@@ -176,7 +324,6 @@
 
   .auth-wait { color: var(--sage); opacity: 0.6; }
 
-  /* Quiet, but present — people should know what they're agreeing to. */
   .terms-note {
     font-family: var(--body);
     font-size: 0.78rem;
@@ -184,6 +331,7 @@
     color: var(--sage);
     margin: 0;
     max-width: 30ch;
+    text-align: center;
   }
   .terms-note a {
     color: #e0c85a;
