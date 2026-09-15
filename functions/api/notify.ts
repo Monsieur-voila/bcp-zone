@@ -27,6 +27,7 @@ const NTFY_TOPIC = "k0mme_thr3ceb";
 interface Env {
   NTFY_URL?: string;
   NTFY_TOPIC?: string;
+  NTFY_TOKEN?: string;
 }
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
@@ -83,4 +84,15 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     // but do report it so it can be diagnosed.
     return ok({ sent: false, reason: String(e?.message || e) });
   }
+  const res = await fetch(`${base.replace(/\/$/, "")}/${topic}`, {
+  method: "POST",
+  headers: {
+    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+    "Title": `Tip from ${who}`,
+    "Priority": "default",
+    "Tags": body.hasVoicemail ? "speech_balloon" : "envelope",
+    "Click": `${site}/tips`,
+  },
+  body: `${preview}${extras}${reply}`,
+});
 };
