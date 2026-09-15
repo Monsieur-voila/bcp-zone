@@ -87,7 +87,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   const res = await fetch(`${base.replace(/\/$/, "")}/${topic}`, {
   method: "POST",
   headers: {
-    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+    ...(token ? { "Authorization": `Basic ${btoa(":" + token)}` } : {}),
     "Title": `Tip from ${who}`,
     "Priority": "default",
     "Tags": body.hasVoicemail ? "speech_balloon" : "envelope",
