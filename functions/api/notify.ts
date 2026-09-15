@@ -4,13 +4,13 @@
 //  Fires a push notification when a tip arrives.
 //
 //  Uses ntfy (https://ntfy.sh) — open source, self-hostable,
-//  no account needed. Set two environment variables:
+//  no account needed.
 //
-//    NTFY_URL   e.g. https://ntfy.sh  (or your own instance)
-//    NTFY_TOPIC your unguessable topic string
+//  If NTFY_URL/NTFY_TOPIC are missing, this quietly does nothing —
+//  a failed notification must never block a tip from being saved.
 //
-//  If either is missing, this quietly does nothing — a failed
-//  notification must never block a tip from being saved.
+//  NTFY_TOKEN (optional) authenticates the request under your
+//  ntfy.sh account, avoiding the shared anonymous-IP rate limit.
 // ─────────────────────────────────────────────────────────────
 
 // ── CONFIG ───────────────────────────────────────────────────
@@ -41,6 +41,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   // the constants above.
   const base = ctx.env.NTFY_URL || NTFY_URL;
   const topic = ctx.env.NTFY_TOPIC || NTFY_TOPIC;
+  const token = ctx.env.NTFY_TOKEN;
 
   if (!base || !topic || topic === "REPLACE_WITH_YOUR_TOPIC") {
     return ok({ sent: false, reason: "not configured" });
@@ -65,10 +66,11 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     const extras = bits.length ? `\n[${bits.join(" · ")}]` : "";
 
     const reply = body.email ? `\nreply: ${body.email}` : "";
-    console.log("DEBUG token present:", !!token, "token length:", token?.length);
+
     const res = await fetch(`${base.replace(/\/$/, "")}/${topic}`, {
       method: "POST",
       headers: {
+        ...(token ? { "Authorization": `Basic ${btoa(":" + token)}` } : {}),
         // ntfy reads these headers for the notification's shape.
         "Title": `Tip from ${who}`,
         "Priority": "default",
@@ -84,15 +86,4 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     // but do report it so it can be diagnosed.
     return ok({ sent: false, reason: String(e?.message || e) });
   }
-  const res = await fetch(`${base.replace(/\/$/, "")}/${topic}`, {
-  method: "POST",
-  headers: {
-    ...(token ? { "Authorization": `Basic ${btoa(":" + token)}` } : {}),
-    "Title": `Tip from ${who}`,
-    "Priority": "default",
-    "Tags": body.hasVoicemail ? "speech_balloon" : "envelope",
-    "Click": `${site}/tips`,
-  },
-  body: `${preview}${extras}${reply}`,
-});
 };
