@@ -41,7 +41,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   const base = ctx.env.NTFY_URL || NTFY_URL;
   const topic = ctx.env.NTFY_TOPIC || NTFY_TOPIC;
 
-  if (!base || !topic || topic === "k0mme_thr3ceb") {
+  if (!base || !topic || topic === "REPLACE_WITH_YOUR_TOPIC") {
     return ok({ sent: false, reason: "not configured" });
   }
 
