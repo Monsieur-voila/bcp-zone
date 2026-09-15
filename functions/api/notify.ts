@@ -65,7 +65,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     const extras = bits.length ? `\n[${bits.join(" · ")}]` : "";
 
     const reply = body.email ? `\nreply: ${body.email}` : "";
-
+    console.log("DEBUG token present:", !!token, "token length:", token?.length);
     const res = await fetch(`${base.replace(/\/$/, "")}/${topic}`, {
       method: "POST",
       headers: {
