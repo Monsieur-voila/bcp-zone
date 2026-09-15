@@ -337,7 +337,7 @@ export async function createReply(threadId: string, body: string) {
   if (clean.length < 2) return { error: "Say a little more." };
   if (clean.length > 5000) return { error: "That's too long (5000 max)." };
 
-  const pending = await needsReview(user);
+  const pending = await needsReview(user);  
 
   const { error } = await supabase.from("replies").insert({
     thread_id: threadId,
