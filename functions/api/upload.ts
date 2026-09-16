@@ -1,131 +1,127 @@
 // ─────────────────────────────────────────────────────────────
-//  POST /api/upload
+//  POST /api/notify
 //
-//  Receives an image, video, or audio file, validates it, and
-//  stores it in a PRIVATE R2 bucket. Returns the object key —
-//  never a public URL.
+//  Fires a push notification (ntfy) AND an email (Resend) when
+//  a tip arrives. Neither can block the other, and neither can
+//  ever block a tip from being saved — this runs after the tip
+//  is already in the database.
 //
-//  Validation is by MAGIC BYTES, not the claimed content type.
-//  A renamed executable fails here even if it says image/jpeg.
+//  ntfy: https://ntfy.sh — open source, no account needed.
+//  If NTFY_URL/NTFY_TOPIC are missing, that half quietly does
+//  nothing. NTFY_TOKEN (optional) authenticates under your
+//  ntfy.sh account, avoiding the shared anonymous-IP rate limit.
+//
+//  Resend: sends from auth@bcp.zone to contacts@bcp.zone.
+//  Requires RESEND_API_KEY. If missing, that half quietly does
+//  nothing.
 // ─────────────────────────────────────────────────────────────
 
-const LIMITS = {
-  image: 25 * 1024 * 1024,    // 25MB
-  video: 150 * 1024 * 1024,   // 150MB
-  audio: 25 * 1024 * 1024,    // 25MB — voice is small; 5 min ≈ 3MB
-};
+// ── CONFIG ───────────────────────────────────────────────────
+//  Set directly here rather than via environment variables.
+//  Cloudflare's variables were not reaching this Function, and a
+//  notification topic is not a meaningful secret — the worst a
+//  leak allows is someone sending you junk notifications. It
+//  grants no access to tips, the database, or anything else.
+//
+//  To change where notifications go, edit these two lines.
+const NTFY_URL = "https://ntfy.sh";
+const NTFY_TOPIC = "k0mme_thr3ceb";
 
-type Kind = "image" | "video" | "audio";
+const EMAIL_FROM = "auth@bcp.zone";
+const EMAIL_TO = "contacts@bcp.zone";
 
-// Identify a file from its leading bytes. Returns the kind and a
-// file extension, or null if it isn't something we accept.
-function sniff(b: Uint8Array): { kind: Kind; ext: string } | null {
-  if (b.length < 16) return null;
-
-  // ── images ──
-  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff)
-    return { kind: "image", ext: "jpg" };
-  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47)
-    return { kind: "image", ext: "png" };
-  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38)
-    return { kind: "image", ext: "gif" };
-  if (b[0] === 0x42 && b[1] === 0x4d)
-    return { kind: "image", ext: "bmp" };
-  // TIFF
-  if ((b[0] === 0x49 && b[1] === 0x49 && b[2] === 0x2a) ||
-      (b[0] === 0x4d && b[1] === 0x4d && b[2] === 0x00))
-    return { kind: "image", ext: "tif" };
-
-  // RIFF container: WEBP (image) or WAV (audio)
-  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46) {
-    if (b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50)
-      return { kind: "image", ext: "webp" };
-    if (b[8] === 0x57 && b[9] === 0x41 && b[10] === 0x56 && b[11] === 0x45)
-      return { kind: "audio", ext: "wav" };
-  }
-
-  // ISO base media (ftyp at offset 4): HEIC, MP4, MOV, M4A
-  if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
-    const brand = String.fromCharCode(b[8], b[9], b[10], b[11]).toLowerCase();
-    if (brand.startsWith("hei") || brand.startsWith("mif") || brand.startsWith("msf"))
-      return { kind: "image", ext: "heic" };
-    if (brand.startsWith("qt"))
-      return { kind: "video", ext: "mov" };
-    if (brand.startsWith("m4a"))
-      return { kind: "audio", ext: "m4a" };
-    return { kind: "video", ext: "mp4" };
-  }
-
-  // Matroska / WebM — audio or video depending on what the browser made
-  if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3)
-    return { kind: "video", ext: "webm" };
-
-  // ── audio ──
-  if (b[0] === 0x4f && b[1] === 0x67 && b[2] === 0x67 && b[3] === 0x53)
-    return { kind: "audio", ext: "ogg" };
-  if (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33)
-    return { kind: "audio", ext: "mp3" };
-  if (b[0] === 0xff && (b[1] & 0xe0) === 0xe0)
-    return { kind: "audio", ext: "mp3" };
-  if (b[0] === 0x66 && b[1] === 0x4c && b[2] === 0x61 && b[3] === 0x43)
-    return { kind: "audio", ext: "flac" };
-
-  return null;
+interface Env {
+  NTFY_URL?: string;
+  NTFY_TOPIC?: string;
+  NTFY_TOKEN?: string;
+  RESEND_API_KEY?: string;
 }
 
-// Strip EXIF from JPEG by dropping APP1/APP2 marker segments.
-// Removes GPS coordinates and camera identifiers — a tipster
-// shouldn't disclose their home location by accident.
-function stripJpegExif(b: Uint8Array): Uint8Array {
-  if (!(b[0] === 0xff && b[1] === 0xd8)) return b;
-  const out: number[] = [0xff, 0xd8];
-  let i = 2;
-  while (i < b.length - 1) {
-    if (b[i] !== 0xff) { out.push(...b.subarray(i)); break; }
-    const marker = b[i + 1];
-    // Start of scan — copy the rest verbatim.
-    if (marker === 0xda) { out.push(...b.subarray(i)); break; }
-    const len = (b[i + 2] << 8) | b[i + 3];
-    const isMeta = marker === 0xe1 || marker === 0xe2 || marker === 0xed;
-    if (!isMeta) out.push(...b.subarray(i, i + 2 + len));
-    i += 2 + len;
-  }
-  return new Uint8Array(out);
-}
-
-export const onRequestPost: PagesFunction<{ TIPS_BUCKET: R2Bucket }> = async (ctx) => {
-  const json = (body: unknown, status = 200) =>
+export const onRequestPost: PagesFunction<Env> = async (ctx) => {
+  const ok = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
-      status, headers: { "content-type": "application/json" },
+      status,
+      headers: { "content-type": "application/json" },
     });
+
+  const base = ctx.env.NTFY_URL || NTFY_URL;
+  const topic = ctx.env.NTFY_TOPIC || NTFY_TOPIC;
+  const token = ctx.env.NTFY_TOKEN;
+  const resendKey = ctx.env.RESEND_API_KEY;
 
   try {
-    const form = await ctx.request.formData();
-    const file = form.get("file");
+    const body = await ctx.request.json<{
+      name?: string;
+      email?: string;
+      message?: string;
+      attachments?: number;
+      hasVoicemail?: boolean;
+    }>();
 
-    if (!(file instanceof File)) return json({ error: "No file received." }, 400);
-    if (file.size === 0)         return json({ error: "That file is empty." }, 400);
+    const who = (body.name || "").trim() || "someone";
+    const preview = (body.message || "").trim().slice(0, 160);
+    const site = new URL(ctx.request.url).origin;
 
-    let bytes = new Uint8Array(await file.arrayBuffer());
-    const id = sniff(bytes);
+    const bits: string[] = [];
+    if (body.hasVoicemail) bits.push("voicemail");
+    if (body.attachments) bits.push(`${body.attachments} file${body.attachments === 1 ? "" : "s"}`);
+    const extras = bits.length ? `\n[${bits.join(" · ")}]` : "";
 
-    if (!id) {
-      return json({ error: "Only photos, video, and audio can be sent." }, 400);
+    const reply = body.email ? `\nreply: ${body.email}` : "";
+    const plainBody = `${preview}${extras}${reply}`;
+
+    // ── ntfy push ──────────────────────────────────────────
+    let ntfyResult: { sent: boolean; status?: number; reason?: string } =
+      { sent: false, reason: "not configured" };
+
+    if (base && topic && topic !== "REPLACE_WITH_YOUR_TOPIC") {
+      try {
+        const res = await fetch(`${base.replace(/\/$/, "")}/${topic}`, {
+          method: "POST",
+          headers: {
+            ...(token ? { "Authorization": `Basic ${btoa(":" + token)}` } : {}),
+            "Title": `Tip from ${who}`,
+            "Priority": "default",
+            "Tags": body.hasVoicemail ? "speech_balloon" : "envelope",
+            "Click": `${site}/tips`,
+          },
+          body: plainBody,
+        });
+        ntfyResult = { sent: res.ok, status: res.status };
+      } catch (e) {
+        ntfyResult = { sent: false, reason: String(e?.message || e) };
+      }
     }
-    if (file.size > LIMITS[id.kind]) {
-      const mb = Math.round(LIMITS[id.kind] / 1048576);
-      return json({ error: `That ${id.kind} is over ${mb}MB.` }, 400);
+
+    // ── Resend email ───────────────────────────────────────
+    let emailResult: { sent: boolean; status?: number; reason?: string } =
+      { sent: false, reason: "not configured" };
+
+    if (resendKey) {
+      try {
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: `BCP Zone <${EMAIL_FROM}>`,
+            to: [EMAIL_TO],
+            subject: `Tip from ${who}`,
+            text: `${plainBody}\n\nReview: ${site}/tips`,
+          }),
+        });
+        emailResult = { sent: res.ok, status: res.status };
+      } catch (e) {
+        emailResult = { sent: false, reason: String(e?.message || e) };
+      }
     }
 
-    if (id.ext === "jpg") bytes = stripJpegExif(bytes);
-
-    const key = `tips/${crypto.randomUUID()}.${id.ext}`;
-    await ctx.env.TIPS_BUCKET.put(key, bytes, {
-      httpMetadata: { contentType: file.type || "application/octet-stream" },
-    });
-
-    return json({ key, kind: id.kind, size: bytes.length });
-  } catch {
-    return json({ error: "Upload failed." }, 500);
+    return ok({ ntfy: ntfyResult, email: emailResult });
+  } catch (e) {
+    // Never let a notification failure surface to the sender,
+    // but do report it so it can be diagnosed.
+    return ok({ sent: false, reason: String(e?.message || e) });
   }
 };
