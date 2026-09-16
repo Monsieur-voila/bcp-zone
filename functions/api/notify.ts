@@ -1,16 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 //  POST /api/notify
 //
-//  Fires a push notification when a tip arrives.
+//  Fires a push notification (ntfy) AND an email (Resend) when
+//  a tip arrives. Neither can block the other, and neither can
+//  ever block a tip from being saved — this runs after the tip
+//  is already in the database.
 //
-//  Uses ntfy (https://ntfy.sh) — open source, self-hostable,
-//  no account needed.
-//
-//  If NTFY_URL/NTFY_TOPIC are missing, this quietly does nothing —
-//  a failed notification must never block a tip from being saved.
-//
-//  NTFY_TOKEN (optional) authenticates the request under your
+//  ntfy: https://ntfy.sh — open source, no account needed.
+//  If NTFY_URL/NTFY_TOPIC are missing, that half quietly does
+//  nothing. NTFY_TOKEN (optional) authenticates under your
 //  ntfy.sh account, avoiding the shared anonymous-IP rate limit.
+//
+//  Resend: sends from auth@bcp.zone to contacts@bcp.zone.
+//  Requires RESEND_API_KEY. If missing, that half quietly does
+//  nothing.
 // ─────────────────────────────────────────────────────────────
 
 // ── CONFIG ───────────────────────────────────────────────────
@@ -24,10 +27,14 @@
 const NTFY_URL = "https://ntfy.sh";
 const NTFY_TOPIC = "k0mme_thr3ceb";
 
+const EMAIL_FROM = "auth@bcp.zone";
+const EMAIL_TO = "contacts@bcp.zone";
+
 interface Env {
   NTFY_URL?: string;
   NTFY_TOPIC?: string;
   NTFY_TOKEN?: string;
+  RESEND_API_KEY?: string;
 }
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
@@ -37,15 +44,10 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       headers: { "content-type": "application/json" },
     });
 
-  // Environment variables win if present; otherwise fall back to
-  // the constants above.
   const base = ctx.env.NTFY_URL || NTFY_URL;
   const topic = ctx.env.NTFY_TOPIC || NTFY_TOPIC;
   const token = ctx.env.NTFY_TOKEN;
-
-  if (!base || !topic || topic === "REPLACE_WITH_YOUR_TOPIC") {
-    return ok({ sent: false, reason: "not configured" });
-  }
+  const resendKey = ctx.env.RESEND_API_KEY;
 
   try {
     const body = await ctx.request.json<{
@@ -66,21 +68,57 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     const extras = bits.length ? `\n[${bits.join(" · ")}]` : "";
 
     const reply = body.email ? `\nreply: ${body.email}` : "";
+    const plainBody = `${preview}${extras}${reply}`;
 
-    const res = await fetch(`${base.replace(/\/$/, "")}/${topic}`, {
-      method: "POST",
-      headers: {
-        ...(token ? { "Authorization": `Basic ${btoa(":" + token)}` } : {}),
-        // ntfy reads these headers for the notification's shape.
-        "Title": `Tip from ${who}`,
-        "Priority": "default",
-        "Tags": body.hasVoicemail ? "speech_balloon" : "envelope",
-        "Click": `${site}/tips`,
-      },
-      body: `${preview}${extras}${reply}`,
-    });
+    // ── ntfy push ──────────────────────────────────────────
+    let ntfyResult: { sent: boolean; status?: number; reason?: string } =
+      { sent: false, reason: "not configured" };
 
-    return ok({ sent: res.ok, status: res.status });
+    if (base && topic && topic !== "REPLACE_WITH_YOUR_TOPIC") {
+      try {
+        const res = await fetch(`${base.replace(/\/$/, "")}/${topic}`, {
+          method: "POST",
+          headers: {
+            ...(token ? { "Authorization": `Basic ${btoa(":" + token)}` } : {}),
+            "Title": `Tip from ${who}`,
+            "Priority": "default",
+            "Tags": body.hasVoicemail ? "speech_balloon" : "envelope",
+            "Click": `${site}/tips`,
+          },
+          body: plainBody,
+        });
+        ntfyResult = { sent: res.ok, status: res.status };
+      } catch (e) {
+        ntfyResult = { sent: false, reason: String(e?.message || e) };
+      }
+    }
+
+    // ── Resend email ───────────────────────────────────────
+    let emailResult: { sent: boolean; status?: number; reason?: string } =
+      { sent: false, reason: "not configured" };
+
+    if (resendKey) {
+      try {
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: `BCP Zone <${EMAIL_FROM}>`,
+            to: [EMAIL_TO],
+            subject: `Tip from ${who}`,
+            text: `${plainBody}\n\nReview: ${site}/tips`,
+          }),
+        });
+        emailResult = { sent: res.ok, status: res.status };
+      } catch (e) {
+        emailResult = { sent: false, reason: String(e?.message || e) };
+      }
+    }
+
+    return ok({ ntfy: ntfyResult, email: emailResult });
   } catch (e) {
     // Never let a notification failure surface to the sender,
     // but do report it so it can be diagnosed.
