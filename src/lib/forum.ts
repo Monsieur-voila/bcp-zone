@@ -426,7 +426,7 @@ export async function sendTip(name: string, email: string, message: string) {
 export async function getTips() {
   const { data, error } = await supabase
     .from("tips")
-    .select("id, name, email, message, is_read, is_archived, created_at")
+    .select("id, name, email, message, attachments, is_read, is_archived, created_at")
     .eq("is_archived", false)
     .order("created_at", { ascending: false });
 
