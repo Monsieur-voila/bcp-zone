@@ -96,7 +96,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     // ── Resend email ───────────────────────────────────────
     let emailResult: { sent: boolean; status?: number; reason?: string } =
       { sent: false, reason: "not configured" };
-
+  console.log("DEBUG resendKey present:", !!resendKey, "all env keys:", Object.keys(ctx.env));
     if (resendKey) {
       try {
         const res = await fetch("https://api.resend.com/emails", {
