@@ -74,8 +74,16 @@ const isActive = (href) =>
 
   /* ── WORDMARK (site title) ──────────────────────────────
      KNOB: font-size = how big. letter-spacing = how spread. */
-  ..wordmark { display: flex; align-items: center; }
-.logo { height: 40px; width: auto; }
+  .wordmark {
+    display: flex;
+    align-items: center;
+    font-family: var(--display);
+    font-size: 1.6rem;          /* phone size */
+    letter-spacing: 0.14em;
+    color: var(--snowmelt);
+    text-align: center;
+  }
+  .logo { height: 40px; width: auto; }
 
   .links {
     display: flex;
@@ -84,8 +92,8 @@ const isActive = (href) =>
     justify-content: center;
     gap: 1rem;
     font-family: var(--mono);
-    font-size: 1.6rem;
-    letter-spacing: 0.14em;
+    font-size: 0.74rem;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
   }
   /* On phone the left/right groups are just inline runs of links. */
@@ -133,7 +141,12 @@ const isActive = (href) =>
     }
 
     /* KNOB: desktop title size. Try 1.8-2.8rem. */
+    .wordmark {
+      font-size: 2.6rem;
+      letter-spacing: 0.16em;
+    }
     .logo { height: 56px; }
+    .logo-link { left: 2rem; }
 
     /* links row: [left group] [ The Table ] [right group]
        three-column grid centers The Table on the page. */
@@ -151,8 +164,6 @@ const isActive = (href) =>
       gap: 1.6rem;
     }
     .side-left  { justify-content: flex-end; }
-    .side-right { justify-content: flex-start; }
-        .side-left  { justify-content: flex-end; }
     .side-right { justify-content: flex-start; }
   }
 </style>
