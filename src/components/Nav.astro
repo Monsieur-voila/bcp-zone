@@ -16,7 +16,9 @@ const isActive = (href) =>
 ---
 
 <header class="nav">
-  <a class="wordmark" href="/">{site.wordmark}</a>
+  <a class="wordmark" href="/">
+  <img class="logo" src="/logo.png" alt={site.wordmark} />
+</a>
 
   <nav class="links" aria-label="Primary">
     <div class="side side-left">
@@ -70,13 +72,8 @@ const isActive = (href) =>
 
   /* ── WORDMARK (site title) ──────────────────────────────
      KNOB: font-size = how big. letter-spacing = how spread. */
-  .wordmark {
-    font-family: var(--display);
-    font-size: 1.25rem;          /* phone size */
-    letter-spacing: 0.14em;
-    color: var(--snowmelt);
-    text-align: center;
-  }
+  ..wordmark { display: flex; align-items: center; }
+.logo { height: 40px; width: auto; }
 
   .links {
     display: flex;
@@ -126,10 +123,7 @@ const isActive = (href) =>
     }
 
     /* KNOB: desktop title size. Try 1.8-2.8rem. */
-    .wordmark {
-      font-size: 2.1rem;
-      letter-spacing: 0.16em;
-    }
+    .logo { height: 56px; }
 
     /* links row: [left group] [ The Table ] [right group]
        three-column grid centers The Table on the page. */
