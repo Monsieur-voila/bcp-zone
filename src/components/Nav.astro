@@ -16,9 +16,11 @@ const isActive = (href) =>
 ---
 
 <header class="nav">
-  <a class="wordmark" href="/">
-  <img class="logo" src="/logo.png" alt={site.wordmark} />
-</a>
+  <a class="logo-link" href="/">
+    <img class="logo" src="/logo.png" alt="BCP home" />
+  </a>
+
+  <a class="wordmark" href="/">{site.wordmark}</a>
 
   <nav class="links" aria-label="Primary">
     <div class="side side-left">
@@ -111,6 +113,14 @@ const isActive = (href) =>
   .link.center:hover { border-color: var(--oxide); background: rgba(192, 90, 46, 0.06); }
   .link.center.active { border-color: var(--oxide); }
 
+  .logo-link {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .logo { height: 32px; width: auto; display: block; }
+
   /* ─────────────────────────────────────────────────────────
      DESKTOP (>=860px): title centered + large on top,
      links row below split around The Table.
@@ -141,6 +151,8 @@ const isActive = (href) =>
       gap: 1.6rem;
     }
     .side-left  { justify-content: flex-end; }
+    .side-right { justify-content: flex-start; }
+        .side-left  { justify-content: flex-end; }
     .side-right { justify-content: flex-start; }
   }
 </style>
