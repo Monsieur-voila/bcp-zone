@@ -627,3 +627,243 @@ export async function getLikesFor(replyIds: string[], myUserId?: string) {
   }
   return result;
 }
+
+export async function getOrCreateThreadForNews(newsSlug: string, title: string) {
+  const { data, error } = await supabase.rpc("get_or_create_news_thread", {
+    p_news_slug: newsSlug,
+    p_title: title,
+  });
+  if (error || !data) {
+    console.error("[forum] get_or_create_news_thread failed:", error?.message);
+    return null;
+  }
+  return data as string; // the thread id
+}
+
+const TOMBSTONE_TEXT = "They Deleted Their Comment But Replies Remain";
+const MAX_INDENT_DEPTH = 4;
+
+function escHtml(s: string) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c as string]));
+}
+
+function buildReplyTree(list: any[]) {
+  const byParent = new Map<string, any[]>();
+  for (const r of list) {
+    const key = r.parent_reply_id ?? "__root__";
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key)!.push(r);
+  }
+  return byParent;
+}
+
+function renderReplyNode(
+  r: any,
+  byParent: Map<string, any[]>,
+  depth: number,
+  likes: Record<string, { count: number; likedByMe: boolean }>,
+  isAdmin: boolean,
+  myUserId: string | null
+): string {
+  const children = byParent.get(r.id) ?? [];
+  const indentDepth = Math.min(depth, MAX_INDENT_DEPTH);
+  const isDeleted = !!r.deleted_at;
+  const like = likes[r.id] ?? { count: 0, likedByMe: false };
+  const isOwn = myUserId && r.author_id === myUserId;
+  const canDelete = !isDeleted && (isOwn || isAdmin);
+
+  const body = isDeleted
+    ? `<div class="r-body tombstone">${TOMBSTONE_TEXT}</div>`
+    : `<div class="r-body">${escHtml(r.body)}</div>`;
+
+  const meta = isDeleted
+    ? `<div class="r-meta">— · ${ago(r.created_at)}</div>`
+    : `<div class="r-meta">
+         ${escHtml(r.profiles?.display_name ?? "neighbor")} · ${ago(r.created_at)}
+         ${r.is_pending ? '<span class="pending-tag">held for review</span>' : ""}
+       </div>`;
+
+  const actions = isDeleted ? "" : `
+    <div class="r-actions">
+      <button class="reply-like-btn${like.likedByMe ? " liked" : ""}" data-like="${r.id}">
+        ♥ ${like.count > 0 ? like.count : ""}
+      </button>
+      <button class="reply-toggle" data-reply-toggle="${r.id}">Reply</button>
+      ${canDelete ? `<button class="reply-delete-btn" data-delete="${r.id}">Delete</button>` : ""}
+    </div>
+    <div class="nested-reply-form" data-nested-form="${r.id}" hidden>
+      <textarea class="input area" rows="3" placeholder="Reply to this…" data-nested-body="${r.id}"></textarea>
+      <button class="post-btn" data-nested-post="${r.id}">Reply</button>
+    </div>`;
+
+  const adminRow = (isAdmin && !isDeleted) ? `
+    <div class="r-admin">
+      ${r.is_pending ? `<button class="admin-btn" data-approve="${r.id}">Approve</button>` : ""}
+      <button class="admin-btn danger" data-hide-reply="${r.id}">Hide</button>
+    </div>` : "";
+
+  const childrenHtml = children
+    .map((c) => renderReplyNode(c, byParent, depth + 1, likes, isAdmin, myUserId))
+    .join("");
+
+  return `
+    <li class="reply${r.is_pending ? " pending" : ""}"${isFresh(r.created_at) && !isDeleted ? ' data-fresh="true"' : ""}
+        style="margin-left: ${indentDepth * 1.4}rem;">
+      ${meta}
+      ${body}
+      ${actions}
+      ${adminRow}
+      ${childrenHtml ? `<ul class="reply-children">${childrenHtml}</ul>` : ""}
+    </li>`;
+}
+
+// Renders a full reply thread (tree + like/delete/reply-form wiring +
+// top-level reply box) into the given containers. Used by both
+// /forum/thread and a news article's inline comments.
+export async function renderReplyThread(opts: {
+  threadId: string;
+  repliesContainer: HTMLElement;
+  replyBoxContainer: HTMLElement;
+  isAdmin: boolean;
+  myUserId: string | null;
+}) {
+  const { threadId, repliesContainer, replyBoxContainer, isAdmin, myUserId } = opts;
+
+  const { data: replies } = await supabase
+    .from("replies")
+    .select(
+      "id, body, created_at, is_pending, author_id, parent_reply_id, deleted_at, profiles(display_name)"
+    )
+    .eq("thread_id", threadId)
+    .eq("is_hidden", false)
+    .order("created_at");
+
+  const list = replies ?? [];
+
+  async function render() {
+    if (!list.length) {
+      repliesContainer.innerHTML =
+        `<li class="empty">No replies yet. Yours would be the first.</li>`;
+      wireBoxEvents();
+      return;
+    }
+
+    const liveIds = list.filter((r: any) => !r.deleted_at).map((r: any) => r.id);
+    const likes = await getLikesFor(liveIds, myUserId ?? undefined);
+
+    const byParent = buildReplyTree(list);
+    const roots = byParent.get("__root__") ?? [];
+    repliesContainer.innerHTML = roots
+      .map((r: any) => renderReplyNode(r, byParent, 0, likes, isAdmin, myUserId))
+      .join("");
+
+    wireReplyEvents();
+  }
+
+  function wireReplyEvents() {
+    if (isAdmin) {
+      repliesContainer.querySelectorAll("[data-approve]").forEach((b: any) =>
+        b.addEventListener("click", async () => {
+          await approveReply(b.dataset.approve);
+          location.reload();
+        }));
+      repliesContainer.querySelectorAll("[data-hide-reply]").forEach((b: any) =>
+        b.addEventListener("click", async () => {
+          await hideReply(b.dataset.hideReply);
+          location.reload();
+        }));
+    }
+
+    repliesContainer.querySelectorAll("[data-like]").forEach((b: any) =>
+      b.addEventListener("click", async () => {
+        if (!myUserId) return;
+        const replyId = b.dataset.like;
+        const liked = b.classList.contains("liked");
+        b.disabled = true;
+        await toggleLike(replyId, myUserId, liked);
+        b.disabled = false;
+        await render();
+      }));
+
+    repliesContainer.querySelectorAll("[data-delete]").forEach((b: any) =>
+      b.addEventListener("click", async () => {
+        if (!confirm("Delete this reply?")) return;
+        const reason = prompt("Reason (optional):") || undefined;
+        await deleteReply(b.dataset.delete, reason);
+        location.reload();
+      }));
+
+    repliesContainer.querySelectorAll("[data-reply-toggle]").forEach((b: any) =>
+      b.addEventListener("click", () => {
+        const formEl = repliesContainer.querySelector(
+          `[data-nested-form="${b.dataset.replyToggle}"]`
+        ) as HTMLElement | null;
+        if (formEl) formEl.hidden = !formEl.hidden;
+      }));
+
+    repliesContainer.querySelectorAll("[data-nested-post]").forEach((b: any) =>
+      b.addEventListener("click", async () => {
+        if (!myUserId) return;
+        const parentId = b.dataset.nestedPost;
+        const textEl = repliesContainer.querySelector(
+          `[data-nested-body="${parentId}"]`
+        ) as HTMLTextAreaElement;
+        const text = textEl.value.trim();
+        if (text.length < 2) return;
+        b.disabled = true;
+        const res = await createReply(threadId, text, parentId);
+        b.disabled = false;
+        if (res.error) { alert(res.error); return; }
+        location.reload();
+      }));
+  }
+
+  function wireBoxEvents() {
+    const signedOut = replyBoxContainer.querySelector("[data-reply-signedout]") as HTMLElement;
+    const form      = replyBoxContainer.querySelector("[data-reply-form]") as HTMLElement;
+    const bodyEl    = replyBoxContainer.querySelector("[data-reply-body]") as HTMLTextAreaElement;
+    const noticeEl  = replyBoxContainer.querySelector("[data-reply-notice]") as HTMLElement;
+    const postBtn   = replyBoxContainer.querySelector("[data-reply-post]") as HTMLButtonElement;
+
+    if (!postBtn || postBtn.dataset.wired) return; // avoid double-binding on re-render
+    postBtn.dataset.wired = "true";
+
+    function showForm(session: any) {
+      const inUser = !!session?.user;
+      signedOut.hidden = inUser;
+      form.hidden = !inUser;
+    }
+    supabase.auth.getSession().then(({ data }) => showForm(data.session));
+    supabase.auth.onAuthStateChange((_e: any, s: any) => showForm(s));
+
+    postBtn.addEventListener("click", async () => {
+      postBtn.disabled = true;
+      postBtn.textContent = "Posting…";
+      noticeEl.hidden = true;
+
+      const res = await createReply(threadId, bodyEl.value);
+
+      postBtn.disabled = false;
+      postBtn.textContent = "Reply";
+
+      if (res.error) {
+        noticeEl.textContent = res.error;
+        noticeEl.hidden = false;
+        return;
+      }
+      if (res.pending) {
+        noticeEl.textContent =
+          "Posted — held for review since it's your first. It'll appear once approved.";
+        noticeEl.hidden = false;
+        bodyEl.value = "";
+        return;
+      }
+      location.reload();
+    });
+  }
+
+  await render();
+  wireBoxEvents();
+}

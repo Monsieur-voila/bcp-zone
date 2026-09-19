@@ -1,8 +1,6 @@
 ---
 import SiteFrame from "../../layouts/SiteFrame.astro";
 import AuthButton from "../../components/AuthButton.astro";
-import "../../styles/heat.css";
-import "../../styles/forum.css";
 ---
 <SiteFrame title="Thread — The Table">
   <div class="tp">
@@ -13,7 +11,6 @@ import "../../styles/forum.css";
       <p class="t-by" data-post-meta></p>
       <div class="t-body" data-post-body></div>
 
-      <!-- admin only -->
       <div class="admin" data-admin hidden>
         <label class="admin-label">Move to</label>
         <select class="admin-select" data-move-select></select>
@@ -26,7 +23,6 @@ import "../../styles/forum.css";
 
     <ul class="replies" data-replies></ul>
 
-    <!-- reply box -->
     <div class="reply-box" data-replybox hidden>
       <p class="signed-out" data-reply-signedout hidden>Sign in to reply.</p>
       <div class="reply-form" data-reply-form hidden>
@@ -43,17 +39,8 @@ import "../../styles/forum.css";
 
 <script>
   import { supabase } from "../../lib/supabase";
-  import { getThread, createReply, myProfile, moveThread,
-           hideThread, hideReply, approveReply, ago,
-           isFresh, deleteReply, toggleLike, getLikesFor } from "../../lib/forum";
-
-  const esc = (s) =>
-    String(s ?? "").replace(/[&<>"']/g, (c) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-    }[c]));
-
-  const TOMBSTONE = "They Deleted Their Comment But Replies Remain";
-  const MAX_INDENT_DEPTH = 4;
+  import { getThread, myProfile, moveThread, hideThread,
+           ago, isFresh, renderReplyThread } from "../../lib/forum";
 
   const id = new URLSearchParams(location.search).get("id");
   const loadingEl = document.querySelector("[data-loading]");
@@ -72,7 +59,6 @@ import "../../styles/forum.css";
       const { thread, replies } = result;
       const profile = await myProfile();
       const isAdmin = profile?.is_admin === true;
-
       const { data: sess } = await supabase.auth.getSession();
       const myUserId = sess.session?.user?.id ?? null;
 
@@ -93,149 +79,6 @@ import "../../styles/forum.css";
         back.textContent = `← ${thread.sections.label}`;
       }
 
-      // ── build the reply tree ──
-      function buildTree(list) {
-        const byParent = new Map();
-        for (const r of list) {
-          const key = r.parent_reply_id ?? "__root__";
-          if (!byParent.has(key)) byParent.set(key, []);
-          byParent.get(key).push(r);
-        }
-        return byParent;
-      }
-
-      function renderNode(r, byParent, depth, likes) {
-        const children = byParent.get(r.id) ?? [];
-        const indentDepth = Math.min(depth, MAX_INDENT_DEPTH);
-        const isDeleted = !!r.deleted_at;
-        const like = likes[r.id] ?? { count: 0, likedByMe: false };
-        const isOwn = myUserId && r.author_id === myUserId;
-        const canDelete = !isDeleted && (isOwn || isAdmin);
-
-        const body = isDeleted
-          ? `<div class="r-body tombstone">${TOMBSTONE}</div>`
-          : `<div class="r-body">${esc(r.body)}</div>`;
-
-        const meta = isDeleted
-          ? `<div class="r-meta">— · ${ago(r.created_at)}</div>`
-          : `<div class="r-meta">
-               ${esc(r.profiles?.display_name ?? "neighbor")} · ${ago(r.created_at)}
-               ${r.is_pending ? '<span class="pending-tag">held for review</span>' : ""}
-             </div>`;
-
-        const actions = isDeleted ? "" : `
-          <div class="r-actions">
-            <button class="reply-like-btn${like.likedByMe ? " liked" : ""}" data-like="${r.id}">
-              ♥ ${like.count > 0 ? like.count : ""}
-            </button>
-            <button class="reply-toggle" data-reply-toggle="${r.id}">Reply</button>
-            ${canDelete ? `<button class="reply-delete-btn" data-delete="${r.id}">Delete</button>` : ""}
-            ${isAdmin && !r.is_pending ? "" : ""}
-          </div>
-          <div class="nested-reply-form" data-nested-form="${r.id}" hidden>
-            <textarea class="input area" rows="3" placeholder="Reply to this…" data-nested-body="${r.id}"></textarea>
-            <button class="post-btn" data-nested-post="${r.id}">Reply</button>
-          </div>`;
-
-        const adminRow = (isAdmin && !isDeleted) ? `
-          <div class="r-admin">
-            ${r.is_pending ? `<button class="admin-btn" data-approve="${r.id}">Approve</button>` : ""}
-            <button class="admin-btn danger" data-hide-reply="${r.id}">Hide</button>
-          </div>` : "";
-
-        const childrenHtml = children
-          .map((c) => renderNode(c, byParent, depth + 1, likes))
-          .join("");
-
-        return `
-          <li class="reply${r.is_pending ? " pending" : ""}"${isFresh(r.created_at) && !isDeleted ? ' data-fresh="true"' : ""}
-              style="margin-left: ${indentDepth * 1.4}rem;">
-            ${meta}
-            ${body}
-            ${actions}
-            ${adminRow}
-            ${childrenHtml ? `<ul class="reply-children">${childrenHtml}</ul>` : ""}
-          </li>`;
-      }
-
-      async function renderReplies(list) {
-        if (!list.length) {
-          repliesEl.innerHTML =
-            `<li class="empty">No replies yet. Yours would be the first.</li>`;
-          return;
-        }
-
-        const liveIds = list.filter((r) => !r.deleted_at).map((r) => r.id);
-        const likes = await getLikesFor(liveIds, myUserId);
-
-        const byParent = buildTree(list);
-        const roots = byParent.get("__root__") ?? [];
-        repliesEl.innerHTML = roots
-          .map((r) => renderNode(r, byParent, 0, likes))
-          .join("");
-
-        wireReplyEvents(list);
-      }
-
-      function wireReplyEvents(list) {
-        if (isAdmin) {
-          repliesEl.querySelectorAll("[data-approve]").forEach((b) =>
-            b.addEventListener("click", async () => {
-              await approveReply(b.dataset.approve);
-              location.reload();
-            }));
-          repliesEl.querySelectorAll("[data-hide-reply]").forEach((b) =>
-            b.addEventListener("click", async () => {
-              await hideReply(b.dataset.hideReply);
-              location.reload();
-            }));
-        }
-
-        repliesEl.querySelectorAll("[data-like]").forEach((b) =>
-          b.addEventListener("click", async () => {
-            if (!myUserId) return;
-            const replyId = b.dataset.like;
-            const liked = b.classList.contains("liked");
-            b.disabled = true;
-            await toggleLike(replyId, myUserId, liked);
-            b.disabled = false;
-            await renderReplies(list);
-          }));
-
-        repliesEl.querySelectorAll("[data-delete]").forEach((b) =>
-          b.addEventListener("click", async () => {
-            if (!confirm("Delete this reply?")) return;
-            const reason = prompt("Reason (optional):") || undefined;
-            await deleteReply(b.dataset.delete, reason);
-            location.reload();
-          }));
-
-        repliesEl.querySelectorAll("[data-reply-toggle]").forEach((b) =>
-          b.addEventListener("click", () => {
-            const formEl = repliesEl.querySelector(
-              `[data-nested-form="${b.dataset.replyToggle}"]`
-            );
-            if (formEl) formEl.hidden = !formEl.hidden;
-          }));
-
-        repliesEl.querySelectorAll("[data-nested-post]").forEach((b) =>
-          b.addEventListener("click", async () => {
-            if (!myUserId) return;
-            const parentId = b.dataset.nestedPost;
-            const textEl = repliesEl.querySelector(`[data-nested-body="${parentId}"]`);
-            const text = textEl.value.trim();
-            if (text.length < 2) return;
-            b.disabled = true;
-            const res = await createReply(thread.id, text, parentId);
-            b.disabled = false;
-            if (res.error) { alert(res.error); return; }
-            location.reload();
-          }));
-      }
-
-      await renderReplies(replies);
-
-      // ── admin controls on the thread ──
       if (isAdmin) {
         const adminEl = document.querySelector("[data-admin]");
         adminEl.hidden = false;
@@ -243,9 +86,8 @@ import "../../styles/forum.css";
         const { data: sections } = await supabase
           .from("sections").select("id,label,blurb").order("sort_order");
         sel.innerHTML = (sections ?? [])
-          .map((s) => `<option value="${s.id}"${s.id === thread.section_id ? " selected" : ""}>${esc(s.label)}</option>`)
+          .map((s) => `<option value="${s.id}"${s.id === thread.section_id ? " selected" : ""}>${s.label}</option>`)
           .join("");
-
         document.querySelector("[data-move-btn]")
           .addEventListener("click", async () => {
             await moveThread(thread.id, sel.value);
@@ -259,64 +101,25 @@ import "../../styles/forum.css";
           });
       }
 
-      // ── top-level reply form ──
-      const signedOut = document.querySelector("[data-reply-signedout]");
-      const form      = document.querySelector("[data-reply-form]");
-      const bodyEl    = document.querySelector("[data-reply-body]");
-      const noticeEl  = document.querySelector("[data-reply-notice]");
-      const postBtn   = document.querySelector("[data-reply-post]");
-
-      function showForm(session) {
-        const inUser = !!session?.user;
-        signedOut.hidden = inUser;
-        form.hidden = !inUser;
-      }
-      showForm(sess.session);
-      supabase.auth.onAuthStateChange((_e, s) => showForm(s));
-
-      postBtn.addEventListener("click", async () => {
-        postBtn.disabled = true;
-        postBtn.textContent = "Posting…";
-        noticeEl.hidden = true;
-
-        const res = await createReply(thread.id, bodyEl.value);
-
-        postBtn.disabled = false;
-        postBtn.textContent = "Reply";
-
-        if (res.error) {
-          noticeEl.textContent = res.error;
-          noticeEl.hidden = false;
-          return;
-        }
-        if (res.pending) {
-          noticeEl.textContent =
-            "Posted — held for review since it's your first. It'll appear once approved.";
-          noticeEl.hidden = false;
-          bodyEl.value = "";
-          return;
-        }
-        location.reload();
+      await renderReplyThread({
+        threadId: thread.id,
+        repliesContainer: repliesEl,
+        replyBoxContainer: boxEl,
+        isAdmin,
+        myUserId,
       });
     }
   }
 </script>
 
 <style>
-  /* An explicit `display` beats the `hidden` attribute, so without
-     this, elements meant to be hidden stay on screen. */
   [hidden] { display: none !important; }
-
-
-  /* Admin controls and reply styling live in global-forum.css
-     (unscoped) because they're injected by JavaScript at runtime. */
   .tp { max-width: 68ch; margin: 0 auto; }
   .back {
     font-family: var(--mono); font-size: 0.7rem;
     letter-spacing: 0.12em; text-transform: uppercase; color: var(--sage);
   }
   .back:hover { color: var(--oxide); }
-
   .post { margin: 1.6rem 0 2.6rem; }
   .t-h1 {
     font-family: var(--display); font-weight: 400;

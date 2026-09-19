@@ -1,6 +1,7 @@
 ---
 import SiteFrame from "../../layouts/SiteFrame.astro";
 import { getCollection } from "astro:content";
+import AuthButton from "../../components/AuthButton.astro";
 
 export async function getStaticPaths() {
   const posts = await getCollection("news", ({ data }) => !data.draft);
@@ -17,7 +18,7 @@ const fmt = (d) =>
 ---
 
 <SiteFrame title={`${post.data.title} — SONNY`} description={post.data.summary}>
-  <article class="post">
+ <article class="post" data-slug={post.slug}>
     <a class="back" href="/">← all news</a>
 
     <div class="post-meta">
@@ -34,14 +35,27 @@ const fmt = (d) =>
       <Content />
     </div>
 
-    <!-- Comments mount here in Stage 5 (data-driven, routes to The Table). -->
-    <div class="comments-mount" data-post={post.slug} aria-label="Comments">
-      <p class="comments-soon">Comments open here soon — and echo into The Table.</p>
+  
+       <div class="comments-mount">
+      <p class="loading" data-loading>Loading comments…</p>
+      <ul class="replies" data-replies hidden></ul>
+      <div class="reply-box" data-replybox hidden>
+        <p class="signed-out" data-reply-signedout hidden>Sign in to reply.</p>
+        <div class="reply-form" data-reply-form hidden>
+          <textarea class="input area" rows="4"
+                    placeholder="Add to the conversation."
+                    data-reply-body></textarea>
+          <p class="notice" data-reply-notice hidden></p>
+          <button class="post-btn" type="button" data-reply-post>Reply</button>
+        </div>
+        <div class="auth-slot"><AuthButton /></div>
+      </div>
     </div>
   </article>
 </SiteFrame>
 
 <style>
+  [hidden] { display: none !important; }
   .post { max-width: 68ch; margin: 0 auto; }
   .back {
     font-family: var(--mono); font-size: 0.7rem;
@@ -92,3 +106,38 @@ const fmt = (d) =>
     letter-spacing: 0.06em; color: var(--sage);
   }
 </style>
+<script>
+  import { supabase } from "../../lib/supabase";
+  import { myProfile, getOrCreateThreadForNews, renderReplyThread } from "../../lib/forum";
+
+  const article = document.querySelector("[data-slug]");
+  const slug = article.dataset.slug;
+  const title = document.querySelector(".post-title").textContent;
+
+  const loadingEl = document.querySelector("[data-loading]");
+  const repliesEl = document.querySelector("[data-replies]");
+  const boxEl     = document.querySelector("[data-replybox]");
+
+  const threadId = await getOrCreateThreadForNews(slug, title);
+
+  if (!threadId) {
+    loadingEl.textContent = "Comments aren't available right now.";
+  } else {
+    const profile = await myProfile();
+    const isAdmin = profile?.is_admin === true;
+    const { data: sess } = await supabase.auth.getSession();
+    const myUserId = sess.session?.user?.id ?? null;
+
+    loadingEl.hidden = true;
+    repliesEl.hidden = false;
+    boxEl.hidden = false;
+
+    await renderReplyThread({
+      threadId,
+      repliesContainer: repliesEl,
+      replyBoxContainer: boxEl,
+      isAdmin,
+      myUserId,
+    });
+  }
+</script>
