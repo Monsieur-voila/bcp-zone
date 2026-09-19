@@ -44,12 +44,16 @@ import "../../styles/forum.css";
 <script>
   import { supabase } from "../../lib/supabase";
   import { getThread, createReply, myProfile, moveThread,
-           hideThread, hideReply, approveReply, ago } from "../../lib/forum";
+           hideThread, hideReply, approveReply, ago,
+           isFresh, deleteReply, toggleLike, getLikesFor } from "../../lib/forum";
 
   const esc = (s) =>
     String(s ?? "").replace(/[&<>"']/g, (c) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
     }[c]));
+
+  const TOMBSTONE = "They Deleted Their Comment But Replies Remain";
+  const MAX_INDENT_DEPTH = 4;
 
   const id = new URLSearchParams(location.search).get("id");
   const loadingEl = document.querySelector("[data-loading]");
@@ -69,6 +73,9 @@ import "../../styles/forum.css";
       const profile = await myProfile();
       const isAdmin = profile?.is_admin === true;
 
+      const { data: sess } = await supabase.auth.getSession();
+      const myUserId = sess.session?.user?.id ?? null;
+
       loadingEl.hidden = true;
       postEl.hidden = false;
       boxEl.hidden = false;
@@ -78,6 +85,7 @@ import "../../styles/forum.css";
       document.querySelector("[data-post-meta]").textContent =
         `${thread.profiles?.display_name ?? "neighbor"} · ${ago(thread.created_at)}`;
       document.querySelector("[data-post-body]").textContent = thread.body ?? "";
+      if (isFresh(thread.created_at)) postEl.setAttribute("data-fresh", "true");
 
       const back = document.querySelector("[data-back]");
       if (thread.sections?.slug) {
@@ -85,29 +93,91 @@ import "../../styles/forum.css";
         back.textContent = `← ${thread.sections.label}`;
       }
 
-      // ── replies ──
-      function renderReplies(list) {
+      // ── build the reply tree ──
+      function buildTree(list) {
+        const byParent = new Map();
+        for (const r of list) {
+          const key = r.parent_reply_id ?? "__root__";
+          if (!byParent.has(key)) byParent.set(key, []);
+          byParent.get(key).push(r);
+        }
+        return byParent;
+      }
+
+      function renderNode(r, byParent, depth, likes) {
+        const children = byParent.get(r.id) ?? [];
+        const indentDepth = Math.min(depth, MAX_INDENT_DEPTH);
+        const isDeleted = !!r.deleted_at;
+        const like = likes[r.id] ?? { count: 0, likedByMe: false };
+        const isOwn = myUserId && r.author_id === myUserId;
+        const canDelete = !isDeleted && (isOwn || isAdmin);
+
+        const body = isDeleted
+          ? `<div class="r-body tombstone">${TOMBSTONE}</div>`
+          : `<div class="r-body">${esc(r.body)}</div>`;
+
+        const meta = isDeleted
+          ? `<div class="r-meta">— · ${ago(r.created_at)}</div>`
+          : `<div class="r-meta">
+               ${esc(r.profiles?.display_name ?? "neighbor")} · ${ago(r.created_at)}
+               ${r.is_pending ? '<span class="pending-tag">held for review</span>' : ""}
+             </div>`;
+
+        const actions = isDeleted ? "" : `
+          <div class="r-actions">
+            <button class="reply-like-btn${like.likedByMe ? " liked" : ""}" data-like="${r.id}">
+              ♥ ${like.count > 0 ? like.count : ""}
+            </button>
+            <button class="reply-toggle" data-reply-toggle="${r.id}">Reply</button>
+            ${canDelete ? `<button class="reply-delete-btn" data-delete="${r.id}">Delete</button>` : ""}
+            ${isAdmin && !r.is_pending ? "" : ""}
+          </div>
+          <div class="nested-reply-form" data-nested-form="${r.id}" hidden>
+            <textarea class="input area" rows="3" placeholder="Reply to this…" data-nested-body="${r.id}"></textarea>
+            <button class="post-btn" data-nested-post="${r.id}">Reply</button>
+          </div>`;
+
+        const adminRow = (isAdmin && !isDeleted) ? `
+          <div class="r-admin">
+            ${r.is_pending ? `<button class="admin-btn" data-approve="${r.id}">Approve</button>` : ""}
+            <button class="admin-btn danger" data-hide-reply="${r.id}">Hide</button>
+          </div>` : "";
+
+        const childrenHtml = children
+          .map((c) => renderNode(c, byParent, depth + 1, likes))
+          .join("");
+
+        return `
+          <li class="reply${r.is_pending ? " pending" : ""}"${isFresh(r.created_at) && !isDeleted ? ' data-fresh="true"' : ""}
+              style="margin-left: ${indentDepth * 1.4}rem;">
+            ${meta}
+            ${body}
+            ${actions}
+            ${adminRow}
+            ${childrenHtml ? `<ul class="reply-children">${childrenHtml}</ul>` : ""}
+          </li>`;
+      }
+
+      async function renderReplies(list) {
         if (!list.length) {
           repliesEl.innerHTML =
             `<li class="empty">No replies yet. Yours would be the first.</li>`;
           return;
         }
-        repliesEl.innerHTML = list.map((r) => `
-          <li class="reply${r.is_pending ? " pending" : ""}">
-            <div class="r-meta">
-              ${esc(r.profiles?.display_name ?? "neighbor")} · ${ago(r.created_at)}
-              ${r.is_pending ? '<span class="pending-tag">held for review</span>' : ""}
-            </div>
-            <div class="r-body">${esc(r.body)}</div>
-            ${isAdmin ? `
-              <div class="r-admin">
-                ${r.is_pending
-                  ? `<button class="admin-btn" data-approve="${r.id}">Approve</button>`
-                  : ""}
-                <button class="admin-btn danger" data-hide-reply="${r.id}">Hide</button>
-              </div>` : ""}
-          </li>`).join("");
 
+        const liveIds = list.filter((r) => !r.deleted_at).map((r) => r.id);
+        const likes = await getLikesFor(liveIds, myUserId);
+
+        const byParent = buildTree(list);
+        const roots = byParent.get("__root__") ?? [];
+        repliesEl.innerHTML = roots
+          .map((r) => renderNode(r, byParent, 0, likes))
+          .join("");
+
+        wireReplyEvents(list);
+      }
+
+      function wireReplyEvents(list) {
         if (isAdmin) {
           repliesEl.querySelectorAll("[data-approve]").forEach((b) =>
             b.addEventListener("click", async () => {
@@ -120,8 +190,50 @@ import "../../styles/forum.css";
               location.reload();
             }));
         }
+
+        repliesEl.querySelectorAll("[data-like]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            if (!myUserId) return;
+            const replyId = b.dataset.like;
+            const liked = b.classList.contains("liked");
+            b.disabled = true;
+            await toggleLike(replyId, myUserId, liked);
+            b.disabled = false;
+            await renderReplies(list);
+          }));
+
+        repliesEl.querySelectorAll("[data-delete]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            if (!confirm("Delete this reply?")) return;
+            const reason = prompt("Reason (optional):") || undefined;
+            await deleteReply(b.dataset.delete, reason);
+            location.reload();
+          }));
+
+        repliesEl.querySelectorAll("[data-reply-toggle]").forEach((b) =>
+          b.addEventListener("click", () => {
+            const formEl = repliesEl.querySelector(
+              `[data-nested-form="${b.dataset.replyToggle}"]`
+            );
+            if (formEl) formEl.hidden = !formEl.hidden;
+          }));
+
+        repliesEl.querySelectorAll("[data-nested-post]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            if (!myUserId) return;
+            const parentId = b.dataset.nestedPost;
+            const textEl = repliesEl.querySelector(`[data-nested-body="${parentId}"]`);
+            const text = textEl.value.trim();
+            if (text.length < 2) return;
+            b.disabled = true;
+            const res = await createReply(thread.id, text, parentId);
+            b.disabled = false;
+            if (res.error) { alert(res.error); return; }
+            location.reload();
+          }));
       }
-      renderReplies(replies);
+
+      await renderReplies(replies);
 
       // ── admin controls on the thread ──
       if (isAdmin) {
@@ -147,7 +259,7 @@ import "../../styles/forum.css";
           });
       }
 
-      // ── reply form ──
+      // ── top-level reply form ──
       const signedOut = document.querySelector("[data-reply-signedout]");
       const form      = document.querySelector("[data-reply-form]");
       const bodyEl    = document.querySelector("[data-reply-body]");
@@ -159,7 +271,6 @@ import "../../styles/forum.css";
         signedOut.hidden = inUser;
         form.hidden = !inUser;
       }
-      const { data: sess } = await supabase.auth.getSession();
       showForm(sess.session);
       supabase.auth.onAuthStateChange((_e, s) => showForm(s));
 
@@ -197,7 +308,7 @@ import "../../styles/forum.css";
   [hidden] { display: none !important; }
 
 
-  /* Admin controls and reply styling live in src/styles/forum.css
+  /* Admin controls and reply styling live in global-forum.css
      (unscoped) because they're injected by JavaScript at runtime. */
   .tp { max-width: 68ch; margin: 0 auto; }
   .back {
