@@ -554,3 +554,69 @@ export async function notifyTip(payload: {
     // Silence is correct here.
   }
 }
+
+const FRESH_WINDOW_MINUTES = 15;
+
+// Is this reply/thread new enough to get the attention treatment?
+export function isFresh(createdAt: string): boolean {
+  const ageMs = Date.now() - new Date(createdAt).getTime();
+  return ageMs < FRESH_WINDOW_MINUTES * 60 * 1000;
+}
+
+// Delete a reply: hard-delete if it has no children,
+// otherwise tombstone it (content wiped, row kept for its children).
+export async function deleteReply(replyId: string, reason?: string) {
+  const { count } = await supabase
+    .from("replies")
+    .select("id", { count: "exact", head: true })
+    .eq("parent_reply_id", replyId);
+
+  if (!count) {
+    const { error } = await supabase.from("replies").delete().eq("id", replyId);
+    return { error };
+  }
+
+  const { error } = await supabase
+    .from("replies")
+    .update({
+      body: null,
+      author_id: null,
+      deleted_at: new Date().toISOString(),
+      delete_reason: reason || null,
+    })
+    .eq("id", replyId);
+  return { error };
+}
+
+export async function toggleLike(replyId: string, userId: string, currentlyLiked: boolean) {
+  if (currentlyLiked) {
+    const { error } = await supabase
+      .from("reply_likes")
+      .delete()
+      .eq("reply_id", replyId)
+      .eq("user_id", userId);
+    return { error };
+  }
+  const { error } = await supabase
+    .from("reply_likes")
+    .insert({ reply_id: replyId, user_id: userId });
+  return { error };
+}
+
+// Fetch likes for a set of replies in one query, returned as
+// { [replyId]: { count, likedByMe } }.
+export async function getLikesFor(replyIds: string[], myUserId?: string) {
+  if (!replyIds.length) return {};
+  const { data } = await supabase
+    .from("reply_likes")
+    .select("reply_id, user_id")
+    .in("reply_id", replyIds);
+
+  const result: Record<string, { count: number; likedByMe: boolean }> = {};
+  for (const id of replyIds) result[id] = { count: 0, likedByMe: false };
+  for (const row of data ?? []) {
+    result[row.reply_id].count++;
+    if (myUserId && row.user_id === myUserId) result[row.reply_id].likedByMe = true;
+  }
+  return result;
+}

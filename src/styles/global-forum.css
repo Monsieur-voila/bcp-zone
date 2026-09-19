@@ -43,6 +43,8 @@
   --heat-pulse-dur-warm: 4.5s;
   --heat-pulse-dur-live: 2.6s;
   --heat-pulse-dur-hot:  1.6s;
+  --fresh-shake-amp: 2px;
+  --fresh-shake-dur: 0.5s;
 
   /* ── Band thresholds (heat is 0–100) ──
      Below LOW-max: dot flashes in place.
@@ -90,10 +92,7 @@
   animation: heat-pulse var(--heat-pulse-dur-live) ease-in-out infinite;
   --heat-pulse-scale: var(--heat-scale-live);
 }
-[data-heat="hot"] {
-  animation: heat-pulse var(--heat-pulse-dur-hot) ease-in-out infinite;
-  --heat-pulse-scale: var(--heat-scale-hot);
-}
+
 
 @keyframes heat-pulse {
   0%, 100% { transform: scale(1); }
@@ -185,6 +184,18 @@
   60%  { opacity: 1; }
   100% { transform: translateX(0); opacity: 1; }
 }
+@keyframes attention-shake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(calc(var(--fresh-shake-amp) * -1)) rotate(-0.3deg); }
+  40% { transform: translateX(var(--fresh-shake-amp)) rotate(0.3deg); }
+  60% { transform: translateX(calc(var(--fresh-shake-amp) * -0.75)) rotate(-0.2deg); }
+  80% { transform: translateX(calc(var(--fresh-shake-amp) * 0.75)) rotate(0.2deg); }
+}
+
+[data-heat="hot"],
+[data-fresh="true"] {
+  animation: attention-shake var(--fresh-shake-dur) ease-in-out infinite;
+}
 
 /* ── The dot (used in headings and the rail card) ──────────── */
 .heat-dot {
@@ -219,6 +230,7 @@
   [data-heat="warm"],
   [data-heat="live"],
   [data-heat="hot"] { animation: none !important; }
+  [data-fresh="true"] { animation: none !important; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
