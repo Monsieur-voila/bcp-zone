@@ -320,7 +320,11 @@ export async function createThread(
   return { id: data.id };
 }
 
-export async function createReply(threadId: string, body: string) {
+export async function createReply(
+  threadId: string,
+  body: string,
+  parentReplyId?: string
+) {
   const user = await currentUser();
   if (!user) return { error: "You need to be signed in." };
 
@@ -328,13 +332,14 @@ export async function createReply(threadId: string, body: string) {
   if (clean.length < 2) return { error: "Say a little more." };
   if (clean.length > 5000) return { error: "That's too long (5000 max)." };
 
-  const pending = await needsReview(user.id);
+  const pending = await needsReview(user);
 
   const { error } = await supabase.from("replies").insert({
     thread_id: threadId,
     author_id: user.id,
     body: clean,
     is_pending: pending,
+    parent_reply_id: parentReplyId || null,
   });
 
   if (error) {
@@ -358,9 +363,11 @@ export async function getThread(id: string) {
 
   if (error || !thread) return null;
 
-  const { data: replies } = await supabase
+    const { data: replies } = await supabase
     .from("replies")
-    .select("id, body, created_at, is_pending, author_id, profiles(display_name)")
+    .select(
+      "id, body, created_at, is_pending, author_id, parent_reply_id, deleted_at, profiles(display_name)"
+    )
     .eq("thread_id", id)
     .eq("is_hidden", false)
     .order("created_at");
