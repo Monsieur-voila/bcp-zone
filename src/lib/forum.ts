@@ -275,15 +275,18 @@ export async function myProfile() {
 
 // Is first-post review switched on, and is this person a first-timer?
 export async function needsReview(userId: string): Promise<boolean> {
-  const { data: setting } = await supabase
+  console.log("[debug] needsReview start", userId);
+  const { data: setting, error: e1 } = await supabase
     .from("settings")
     .select("value")
     .eq("key", "hold_first_post_for_review")
     .single();
+  console.log("[debug] settings result", setting, e1);
 
   if (setting?.value !== true) return false;
 
-  const { data } = await supabase.rpc("is_first_post", { uid: userId });
+  const { data, error: e2 } = await supabase.rpc("is_first_post", { uid: userId });
+  console.log("[debug] is_first_post result", data, e2);
   return data === true;
 }
 
