@@ -841,7 +841,8 @@ export async function renderReplyThread(opts: {
     supabase.auth.getSession().then(({ data }) => showForm(data.session));
     supabase.auth.onAuthStateChange((_e: any, s: any) => showForm(s));
 
-    postBtn.addEventListener("click", async () => {
+        postBtn.addEventListener("click", async () => {
+      console.log("[debug] reply button clicked");
       postBtn.disabled = true;
       postBtn.textContent = "Posting…";
       noticeEl.hidden = true;
