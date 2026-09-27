@@ -1,0 +1,119 @@
+---
+import { status } from "../site.config";
+const items = status.items;
+const first = items[0];
+---
+<div class="ticker" data-ticker
+     data-interval={status.interval}
+     data-items={JSON.stringify(items)}>
+  <span class="dot" aria-hidden="true"></span>
+  <a class="entry" data-entry href={first.href}>
+    <span class="label" data-label>{first.label}</span>
+    <span class="viewport" data-viewport>
+      <span class="text" data-text>{first.text}</span>
+    </span>
+  </a>
+  <span class="upd">upd {status.updated}</span>
+</div>
+
+<script>
+  const root = document.querySelector("[data-ticker]");
+  if (root) {
+    const items = JSON.parse(root.dataset.items || "[]");
+    const hold = Number(root.dataset.interval) || 7000;
+    const entry    = root.querySelector("[data-entry]");
+    const labelEl  = root.querySelector("[data-label]");
+    const viewport = root.querySelector("[data-viewport]");
+    const textEl   = root.querySelector("[data-text]");
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const SPEED = 45;   // px per second while scrolling
+    const PAUSE = 1500; // ms to rest before and after a scroll
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    async function show(item) {
+      entry.getAnimations().forEach((a) => a.cancel());
+      textEl.getAnimations().forEach((a) => a.cancel());
+
+      entry.href = item.href || "#";
+      labelEl.textContent = item.label;
+      textEl.textContent = item.text;
+
+      await entry.animate([{ opacity: 0 }, { opacity: 1 }],
+        { duration: 400, fill: "forwards" }).finished;
+
+      const overflow = textEl.scrollWidth - viewport.clientWidth;
+      if (overflow > 0 && !reduce) {
+        await wait(PAUSE);
+        await textEl.animate(
+          [{ transform: "translateX(0)" }, { transform: `translateX(-${overflow}px)` }],
+          { duration: (overflow / SPEED) * 1000, easing: "linear", fill: "forwards" }
+        ).finished;
+        await wait(PAUSE);
+      } else {
+        await wait(hold);
+      }
+
+      if (items.length > 1) {
+        await entry.animate([{ opacity: 1 }, { opacity: 0 }],
+          { duration: 400, fill: "forwards" }).finished;
+      }
+    }
+
+    (async () => {
+      let i = 0;
+      while (items.length) {
+        await show(items[i]);
+        i = (i + 1) % items.length;
+      }
+    })();
+  }
+</script>
+
+<style>
+  .ticker {
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.6rem 1.3rem;
+    background: rgba(20, 23, 26, 0.86);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+  }
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%; flex: none;
+    background: var(--oxide);
+    animation: tick-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes tick-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+  .entry {
+    display: flex; align-items: center; gap: 0.7rem;
+    flex: 1; min-width: 0;
+    color: var(--snowmelt); text-decoration: none;
+  }
+  .label {
+    flex: none; color: var(--oxide);
+    letter-spacing: 0.14em; font-weight: 400;
+  }
+  .viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .text {
+    display: inline-block; white-space: nowrap;
+    transition: color 0.2s ease;
+  }
+  .entry:hover .text { color: var(--oxide); }
+  .upd { flex: none; color: var(--sage); opacity: 0.7; }
+
+  @media (max-width: 600px) { .upd { display: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .dot { animation: none; }
+    .text { white-space: normal; }
+  }
+</style>
