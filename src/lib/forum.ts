@@ -373,7 +373,7 @@ export async function getThread(id: string) {
     const { data: replies } = await supabase
     .from("replies")
     .select(
-      "id, body, created_at, is_pending, author_id, parent_reply_id, deleted_at, profiles(display_name)"
+      "id, body, created_at, is_pending, author_id, parent_reply_id, deleted_at, profiles!author_id(display_name)"
     )
     .eq("thread_id", id)
     .eq("is_hidden", false)
@@ -741,7 +741,7 @@ export async function renderReplyThread(opts: {
   const { data: replies } = await supabase
     .from("replies")
     .select(
-      "id, body, created_at, is_pending, author_id, parent_reply_id, deleted_at, profiles(display_name)"
+      "id, body, created_at, is_pending, author_id, parent_reply_id, deleted_at, profiles!author_id(display_name)"
     )
     .eq("thread_id", threadId)
     .eq("is_hidden", false)
